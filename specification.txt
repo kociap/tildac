@@ -1,0 +1,55 @@
+Primitive Types
+bool - boolean type representing true or false
+char - unicode character (?)
+i8 - 8-bit signed integer
+i16 - 16-bit signed integer
+i32 - 32-bit signed integer
+i64 - 64-bit signed integer
+i128 - 128-bit signed integer
+u8 - 8-bit unsigned integer
+u16 - 16-bit unsigned integer
+u32 - 32-bit unsigned integer
+u64 - 64-bit unsigned integer
+u128 - 128-bit unsigned integer
+f32 - 32-bit floating point number
+f64 - 64-bit floating point number
+isize - pointer sized signed integer
+usize - pointer sized unsigned integer
+
+
+Keywords
+mut - designates an object as mutable
+ref - indicates an object is passed as reference
+
+References
+references are non-nullable
+
+Mutability
+everything is immutable by default. to make an object mutable, use mut specifier.
+
+Pointers
+T* designates a pointer
+& takes address of a variable. not overloadable
+nullptr - null pointer literal of type nullptr_t (?)
+
+Arrays
+builtin type that doesn't decay to a pointer
+there's a way to retrieve its size (member size fn? non-member size fn?)
+
+Ternary operator ?:
+is an expression itself
+expression ? [expression] : expression
+first parameter has to be implicitly convertible to bool
+- if either 2nd or 3rd parameter has nullptr_t type, the other parameter must have pointer type.
+- otherwise both parameters must be of the same type.
+
+
+Designated initializers
+in any order, nested
+
+Initialization
+brace initialization ( {} ) for everything
+
+Modules
+ - everything is exported by default. to make an entity local to a module use the `internal` specifier
+ - accessing names exported by a module is done via 
