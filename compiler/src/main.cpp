@@ -14,6 +14,7 @@ enum class Token_Type {
     oper,
     identifier,
     integer_literal,
+    float_literal,
     string_literal,
 };
 
@@ -24,6 +25,7 @@ static std::string_view stringify_token_type(Token_Type t) {
         case Token_Type::oper: return "oper";
         case Token_Type::identifier: return "identifier";
         case Token_Type::integer_literal: return "integer_literal";
+        case Token_Type::float_literal: return "float_literal";
         case Token_Type::string_literal: return "string_literal";
     }
 }
@@ -51,17 +53,21 @@ static bool is_valid_identifier(char c) {
 }
 
 static bool is_operator(char c) {
-    return c == '-' || c == '+' || c == '/' || c == '*' ||
-           c == '>' || c == '<';
+    return c == '-' || c == '+' || c == '/' || c == '*' || c == '%' ||
+           c == '>' || c == '<' || c == '=' || c == '|' || c == '&' || c == '^' || c == '!' ||
+           c == '@';
 }
 
 static bool is_separator(char c) {
-    return c == '(' || c == ')' || c == '{' || c == '}' || c == ';';
+    return c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == ';' || c == ',';
 }
 
 static bool is_integer_literal(char c) {
     return c >= '0' && c <= '9';
 }
+
+static std::string_view const keywords[] = { "fn", "if", "else", "for", "while", "do", "return",
+                                             "i64", "c8" };
 
 static void compile(std::string_view path) {
     std::string const path_str(path);
@@ -76,7 +82,7 @@ static void compile(std::string_view path) {
     std::vector<char> file_contents(file_size + 1, 0);
     file.read(file_contents.data(), file_size);
     file.close();
-    file_contents.push_back(-1);
+    file_contents[file_contents.size() - 1] = -1;
 
     std::cout << "File read" << std::endl;
 
@@ -97,7 +103,14 @@ static void compile(std::string_view path) {
                 token.str.push_back(file_contents[index]);
                 index += 1;
             }
-            std::cout << "Read identifier (" << index - index_backup << " characters):" << token.str << std::endl;
+
+            for(i64 i = 0; i < (sizeof(keywords) / sizeof(keywords[0])); ++i) {
+                if(token.str == keywords[i]) {
+                    token.type = Token_Type::keyword;
+                    break;
+                }
+            }
+
             tokens.push_back(std::move(token));
             continue;
         }
@@ -136,6 +149,9 @@ static void compile(std::string_view path) {
             tokens.push_back(std::move(token));
             continue;
         }
+
+        std::cout << "Unknown symbol " << file_contents[index] << std::endl;
+        break;
     }
 
     for(Token& token: tokens) {
