@@ -6,6 +6,21 @@ fn pow(i64 base, i64 exp) -> i64 {
     return v;
 }
 
+fn mul(f32 a, f32 b) -> f32 {
+    return a * b;
+}
+
+fn should_crash() -> bool {
+    return false;
+}
+
 fn main(i64 argc, c8[] argv) -> i64 {
-    return pow(5, 11);
+    print("% %", pow(4, 11), mul(5.5, 1.1));
+    if should_crash() {
+        while true {
+            we_pretend_we_crashed_by_never_returning();
+            i_havent_implemented_comments_yet();
+        }
+    }
+    return false;
 }

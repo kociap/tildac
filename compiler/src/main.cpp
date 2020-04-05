@@ -13,6 +13,7 @@ enum class Token_Type {
     separator,
     oper,
     identifier,
+    bool_literal,
     integer_literal,
     float_literal,
     string_literal,
@@ -24,6 +25,7 @@ static std::string_view stringify_token_type(Token_Type t) {
         case Token_Type::separator: return "separator";
         case Token_Type::oper: return "oper";
         case Token_Type::identifier: return "identifier";
+        case Token_Type::bool_literal: return "bool_literal";
         case Token_Type::integer_literal: return "integer_literal";
         case Token_Type::float_literal: return "float_literal";
         case Token_Type::string_literal: return "string_literal";
@@ -62,14 +64,20 @@ static bool is_separator(char c) {
     return c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == ';' || c == ',';
 }
 
-static bool is_integer_literal(char c) {
+static bool is_digit(char c) {
     return c >= '0' && c <= '9';
 }
 
-static std::string_view const keywords[] = { "fn", "if", "else", "for", "while", "do", "return",
-                                             "i64", "c8" };
+static bool is_bool_literal(std::string_view identifier) {
+    return identifier == "true" || identifier == "false";
+}
+
+static std::string_view const keywords[] = { "fn", "if", "else", "switch", "case" "for", "while", "do", "return", "break", "continue",
+                                             "bool", "c8", "c16", "c32", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "f32", "f64",
+                                             "mut" };
 
 static void compile(std::string_view path) {
+    std::cout << "Opening " << path << " for reading" << std::endl;
     std::string const path_str(path);
     std::ifstream file(path_str);
     if(!file) {
@@ -84,13 +92,53 @@ static void compile(std::string_view path) {
     file.close();
     file_contents[file_contents.size() - 1] = -1;
 
-    std::cout << "File read" << std::endl;
+    std::cout << "File read\nLexing " << path << std::endl;
 
     std::vector<Token> tokens;
 
-    for(i64 index = 0; file_contents[index] != -1;) {
+    for(i64 index = 0; true;) {
         while(is_whitespace(file_contents[index])) {
             index += 1;
+        }
+
+        // integer literal and float literal of the form 
+        if(is_digit(file_contents[index]) || file_contents[index] == '.' && is_digit(file_contents[index + 1])) {
+            bool has_dot = file_contents[index] == '.';
+            Token token;
+            token.type = has_dot ? Token_Type::float_literal : Token_Type::integer_literal;
+            token.str.push_back(file_contents[index]);
+            index += 1;
+            while(is_digit(file_contents[index]) || file_contents[index] == '.') {
+                if(file_contents[index] == '.') {
+                    if(has_dot) {
+                        std::cout << "Invalid float literal: multiple decimal separators." << std::endl;
+                        return;
+                    }
+
+                    has_dot = true;
+                    token.type = Token_Type::float_literal;
+                }
+                
+                token.str.push_back(file_contents[index]);
+                index += 1;
+            }
+
+            tokens.push_back(std::move(token));
+            continue;
+        }
+
+        // string literal
+        if(file_contents[index] == '"') {
+            Token token;
+            token.type = Token_Type::string_literal;
+            do {
+                token.str.push_back(file_contents[index]);
+                ++index;
+            } while(file_contents[index] != '"' || file_contents[index - 1] == '\\');
+            token.str.push_back('"');
+            ++index;
+            tokens.push_back(std::move(token));
+            continue;
         }
 
         if(is_valid_first_identifier(file_contents[index])) {
@@ -104,10 +152,14 @@ static void compile(std::string_view path) {
                 index += 1;
             }
 
-            for(i64 i = 0; i < (sizeof(keywords) / sizeof(keywords[0])); ++i) {
-                if(token.str == keywords[i]) {
-                    token.type = Token_Type::keyword;
-                    break;
+            if(is_bool_literal(token.str)) {
+                token.type = Token_Type::bool_literal;
+            } else {
+                for(i64 i = 0; i < (sizeof(keywords) / sizeof(keywords[0])); ++i) {
+                    if(token.str == keywords[i]) {
+                        token.type = Token_Type::keyword;
+                        break;
+                    }
                 }
             }
 
@@ -137,22 +189,15 @@ static void compile(std::string_view path) {
             continue;
         }
 
-        if(is_integer_literal(file_contents[index])) {
-            Token token;
-            token.type = Token_Type::integer_literal;
-            token.str.push_back(file_contents[index]);
-            index += 1;
-            while(is_integer_literal(file_contents[index])) {
-                token.str.push_back(file_contents[index]);
-                index += 1;
-            }
-            tokens.push_back(std::move(token));
-            continue;
+        if(file_contents[index] == -1) {
+            break;
         }
 
         std::cout << "Unknown symbol " << file_contents[index] << std::endl;
-        break;
+        return;
     }
+
+    std::cout << "Lexed file " << path << ". Tokens: \n";
 
     for(Token& token: tokens) {
         std::cout << stringify_token_type(token.type) << ": " << token.str << '\n';
