@@ -18,8 +18,15 @@ fn main(i64 argc, c8[] argv) -> i64 {
     print("% %", pow(4, 11), mul(5.5, 1.1));
     if should_crash() {
         while true {
-            we_pretend_we_crashed_by_never_returning();
-            i_havent_implemented_comments_yet();
+            // We pretend we crash by never returning
+            we_pretend_we_crashed_by_never_returning_but_its_a_function();
+            /* The line below tells lies */
+            the_line_above_is_true();
+            /* multiline drifting
+             * more comment
+             * and more
+             * and more * /
+             */function_call();
         }
     }
     return false;
