@@ -2,6 +2,8 @@
 #define TILDAC_TYPES_HPP_INCLUDE
 
 namespace tildac {
+    using char32 = char32_t;
+    
     using u8 = unsigned char;
     using i64 = long long;
 }

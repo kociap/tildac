@@ -1,6 +1,8 @@
 #include <tildac/parser.hpp>
 
+#include <tildac/utility.hpp>
 #include <tildac/types.hpp>
+#include <tildac/ast.hpp>
 
 #include <vector>
 #include <iostream>
@@ -8,73 +10,388 @@
 #include <fstream>
 
 namespace tildac {
-    enum class Token_Type {
+    enum class Token_Category {
+        eof,
         keyword,
         separator,
-        oper,
+        operator_,
         identifier,
+        // literal,
+    };
+
+    enum class Keyword {
+        kw_fn,
+        kw_if,
+        kw_else,
+        kw_switch,
+        kw_case,
+        kw_for,
+        kw_while,
+        kw_do,
+        kw_return,
+        kw_break,
+        kw_continue,
+        kw_bool,
+        kw_c8,
+        kw_c16,
+        kw_c32,
+        kw_i8,
+        kw_u8,
+        kw_i16,
+        kw_u16,
+        kw_i32,
+        kw_u32,
+        kw_i64,
+        kw_u64,
+        kw_f32,
+        kw_f64,
+        kw_mut,
+    };
+
+    enum class Separator {
+        brace_open,
+        brace_close,
+        bracket_open,
+        bracket_close,
+        paren_open,
+        paren_close,
+        angle_open,
+        angle_close,
+        drill,
+        semicolon,
+        colon,
+        scope_resolution,
+        comma,
+    };
+
+    // TODO: Add compound operators (+=, -=, etc.).
+    enum class Operator {
+        plus,
+        minus,
+        multiply,
+        divide,
+        modulo,
+        logic_and,
+        bit_and,
+        logic_or,
+        bit_or,
+        bit_xor,
+        logic_negation,
+        bit_negation,
+        equal,
+        not_equal,
+        less,
+        greater,
+        less_equal,
+        greater_equal,
+        assign,
+        address,
+        dereference,
+        drill,
+    };
+
+    enum class Literal {
         bool_literal,
         integer_literal,
         float_literal,
         string_literal,
     };
 
-    static std::string_view stringify_token_type(Token_Type t) {
+    union Token_Type {
+        Separator separator;
+        Keyword keyword;
+        Literal literal;
+        Operator operator_;
+    };
+
+    static std::string_view stringify_token_category(Token_Category t) {
         switch(t) {
-            case Token_Type::keyword: return "keyword";
-            case Token_Type::separator: return "separator";
-            case Token_Type::oper: return "oper";
-            case Token_Type::identifier: return "identifier";
-            case Token_Type::bool_literal: return "bool_literal";
-            case Token_Type::integer_literal: return "integer_literal";
-            case Token_Type::float_literal: return "float_literal";
-            case Token_Type::string_literal: return "string_literal";
+            case Token_Category::keyword: return "keyword";
+            case Token_Category::separator: return "separator";
+            case Token_Category::operator_: return "operator";
+            case Token_Category::identifier: return "identifier";
+            // case Token_Category::literal: return "literal";
         }
     }
 
     struct Token {
+        Token_Category category;
         Token_Type type;
-        std::string str;
+        // TODO: string interning.
+        std::string name;
     };
 
-    static bool is_whitespace(char c) {
+    static bool is_whitespace(char32 c) {
         return (c >= 0 & c <= 32) | (c == 127);
     }
 
-    static bool is_valid_first_identifier(char c) {
-        return (c >= 'A' & c <= 'Z') ||
-            (c >= 'a' & c <= 'z') ||
-            c == '_';
+    static bool is_digit(char32 c) {
+        return c >= 48 && c < 58;
     }
 
-    static bool is_valid_identifier(char c) {
-        return (c >= 'A' & c <= 'Z') ||
-            (c >= 'a' & c <= 'z') ||
-            (c >= '0' & c <= '9') ||
-            c == '_';
+    static bool is_alpha(char32 c) {
+        return (c >= 97 && c < 123) || (c >= 65 && c < 91);
     }
 
-    static bool is_operator(char c) {
-        return c == '-' || c == '+' || c == '/' || c == '*' || c == '%' ||
-            c == '>' || c == '<' || c == '=' || c == '|' || c == '&' || c == '^' || c == '!' ||
-            c == '@';
+    static bool is_first_identifier_character(char32 c) {
+        return c == '_' || is_alpha(c);
     }
 
-    static bool is_separator(char c) {
-        return c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == ';' || c == ',';
+    static bool is_identifier_character(char32 c) {
+        return c == '_' || is_digit(c) || is_alpha(c);
     }
 
-    static bool is_digit(char c) {
-        return c >= '0' && c <= '9';
-    }
+    class Lexer_State {
+    public:
+        i64 stream_offset;
+    };
 
-    static bool is_bool_literal(std::string_view identifier) {
-        return identifier == "true" || identifier == "false";
-    }
+    class Lexer {
+    public:
+        Lexer(std::istream& file): _stream(file) {}
 
-    static std::string_view const keywords[] = { "fn", "if", "else", "switch", "case" "for", "while", "do", "return", "break", "continue",
-                                                "bool", "c8", "c16", "c32", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "f32", "f64",
-                                                "mut" };
+        bool try_match_separator(Separator const separator) {
+            static constexpr std::string_view separators[] = {
+                "{", "}", "[", "]", "(", ")", "<", ">", "->", ";", ":", "::", ","
+            };
+
+            ignore_whitespace_and_comments();
+
+            Lexer_State const state_backup = get_current_state();
+            std::string_view const str = separators[static_cast<i64>(separator)];
+            for(auto i = str.begin(), end = str.end(); i != end; ++i) {
+                if(_stream.get() != *i) {
+                    restore_state(state_backup);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool try_match_operator(Operator const operator_) {
+            static constexpr std::string_view operators[] = {
+                "+", "-", "*", "/", "%", "&&", "&", "||", "|", "^", "!", "~", 
+                "==", "!=", "<", ">", "<=", ">=", "=", "@", "*", "->"
+            };
+
+            ignore_whitespace_and_comments();
+
+            Lexer_State const state_backup = get_current_state();
+            std::string_view const str = operators[static_cast<i64>(operator_)];
+            for(auto i = str.begin(), end = str.end(); i != end; ++i) {
+                if(_stream.get() != *i) {
+                    restore_state(state_backup);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool try_match_keyword(Keyword const keyword) {
+            static constexpr std::string_view keywords[] = {
+                "fn", "if", "else", "switch", "case" "for", "while", "do", "return", "break", "continue",
+                "bool", "c8", "c16", "c32", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "f32", "f64",
+                "mut"
+            };
+
+            ignore_whitespace_and_comments();
+
+            Lexer_State const state_backup = get_current_state();
+            std::string_view const str = keywords[static_cast<i64>(keyword)];
+            for(auto i = str.begin(), end = str.end(); i != end; ++i) {
+                if(_stream.get() != *i) {
+                    restore_state(state_backup);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool try_match_identifier(std::string* const out) {
+            ignore_whitespace_and_comments();
+
+            // No need to backup the lexer state since we can predict whether the next
+            // sequence of characters is an identifier using only the first character.
+            char32 const next_char = _stream.peek();
+            if(!is_first_identifier_character(next_char)) {
+                return false;
+            }
+
+            _stream.get();
+            if(out) {
+                *out += next_char;
+                for(char32 peek = _stream.peek(); is_identifier_character(peek); peek = _stream.peek()) {
+                    *out += peek;
+                    _stream.get();
+                }
+            } else {
+                while(is_identifier_character(_stream.peek())) {
+                    _stream.get();
+                }
+            }
+            return true;
+        }
+
+        bool try_match_eof() {
+            ignore_whitespace_and_comments();
+            char32 const next_char = _stream.peek();
+            return next_char == std::char_traits<char>::eof();
+        }
+
+        void ignore_whitespace_and_comments() {
+            while(true) {
+                char32 const next_char = _stream.peek();
+                if(is_whitespace(next_char)) {
+                    _stream.get();
+                    continue;
+                }
+
+                if(next_char == U'/') {
+                    _stream.get();
+                    char32 const next_next_char = _stream.peek();
+                    if(next_next_char == U'/') {
+                        _stream.get();
+                        while(_stream.get() != U'\n') {}
+                    } else if(next_next_char == U'*') {
+                        _stream.get();
+                        for(char32 c1 = _stream.get(), c2 = _stream.peek(); c1 != U'*' || c2 != U'/'; c1 = _stream.get(), c2 = _stream.peek()) {}
+                        _stream.get();
+                    } else {
+                        _stream.unget();
+                    }
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+
+        Lexer_State get_current_state() const {
+            return {_stream.tellg()};
+        }
+
+        void restore_state(Lexer_State const state) {
+            _stream.seekg(state.stream_offset, std::ios_base::beg);
+        }
+
+    private:
+        std::istream& _stream;
+    };
+
+    class Parser {
+    public:
+        Parser(std::istream& stream): _lexer(stream) {}
+
+        void build_ast() {
+            while(true) {
+                if(Declaration_Sequence* decl_seq = try_declaration_sequence(); decl_seq) {
+                    decl_seq->print(std::cout, Indent{0});
+                    delete decl_seq;
+                }
+
+                if(_lexer.try_match_eof()) {
+                    break;
+                }
+            }   
+        }
+
+    private:
+        Lexer _lexer;
+        
+        Declaration_Sequence* try_declaration_sequence() {
+            Declaration_Sequence* const declaration_sequence = new Declaration_Sequence;
+            while(true) {
+                Declaration* declaration = try_declaration();
+                if(declaration) {
+                    declaration_sequence->append_declaration(declaration);
+                } else {
+                    break;
+                }
+            }
+
+            i64 const declaration_count = declaration_sequence->get_declarations_count();
+            if(declaration_count > 0) {
+                return declaration_sequence;
+            } else {
+                delete declaration_sequence;
+                return nullptr;
+            }
+        }
+
+        Declaration* try_declaration() {
+            if(Function_Declaration* function_declaration = try_function_declaration(); function_declaration) {
+                return function_declaration;
+            }
+
+            return nullptr;
+        }
+
+        Function_Declaration* try_function_declaration() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.try_match_keyword(Keyword::kw_fn)) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Identifier* name = nullptr;
+            if(std::string fn_name; _lexer.try_match_identifier(&fn_name)) {
+                name = new Identifier(std::move(fn_name));
+            } else {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.try_match_separator(Separator::paren_open)) {
+                _lexer.restore_state(state_backup);
+                delete name;
+                return nullptr;
+            }
+
+            // TODO: Parameter list.
+
+            if(!_lexer.try_match_separator(Separator::paren_close)) {
+                _lexer.restore_state(state_backup);
+                delete name;
+                return nullptr;
+            }
+
+            if(!_lexer.try_match_separator(Separator::drill)) {
+                _lexer.restore_state(state_backup);
+                delete name;
+                return nullptr;
+            }
+
+            // TODO: Implement proper types.
+            Type_Name* return_type = nullptr;
+            if(std::string return_name; _lexer.try_match_identifier(&return_name)) {
+                return_type = new Type_Name();
+            } else {
+                _lexer.restore_state(state_backup);
+                delete name;
+                return nullptr;
+            }
+
+            Function_Body* function_body = try_function_body();
+            if(!function_body) {
+                _lexer.restore_state(state_backup);
+                delete name;
+                delete return_type;
+                return nullptr;
+            }
+
+            return new Function_Declaration(name, return_type, function_body);
+        }
+
+        Function_Body* try_function_body() {
+            if(_lexer.try_match_separator(Separator::brace_open) && _lexer.try_match_separator(Separator::brace_close)) {
+                return new Function_Body;
+            } else {
+                return nullptr;
+            }
+        }
+    };
+
 
     void parse_file(std::string_view const path) {
         std::cout << "Opening " << path << " for reading" << std::endl;
@@ -84,144 +401,8 @@ namespace tildac {
             std::cout << "Could not open " << path << "\n";
             return;
         }
-        file.seekg(0, std::ios::end);
-        i64 const file_size = file.tellg();;
-        file.seekg(0, std::ios::beg);
-        std::vector<char> file_contents(file_size + 1, 0);
-        file.read(file_contents.data(), file_size);
-        file.close();
-        file_contents[file_contents.size() - 1] = -1;
-
-        std::cout << "File read\nLexing " << path << std::endl;
-
-
-        std::vector<Token> tokens;
-
-        for(i64 index = 0; true;) {
-            while(is_whitespace(file_contents[index])) {
-                index += 1;
-            }
-
-            // Line comment
-            if(file_contents[index] == '/' && file_contents[index + 1] == '/') {
-                index += 2;
-                while(file_contents[index] != '\n') {
-                    index += 1;
-                }
-                index += 1;
-                continue;
-            }
-
-            // Block comment
-            if(file_contents[index] == '/' && file_contents[index + 1] == '*') {
-                index += 2;
-                while(file_contents[index] != '*' || file_contents[index + 1] != '/') {
-                    index += 1;
-                }
-                index += 2;
-                continue;
-            }
-
-            // integer literal and float literal of the form 
-            if(is_digit(file_contents[index]) || file_contents[index] == '.' && is_digit(file_contents[index + 1])) {
-                bool has_dot = file_contents[index] == '.';
-                Token token;
-                token.type = has_dot ? Token_Type::float_literal : Token_Type::integer_literal;
-                token.str.push_back(file_contents[index]);
-                index += 1;
-                while(is_digit(file_contents[index]) || file_contents[index] == '.') {
-                    if(file_contents[index] == '.') {
-                        if(has_dot) {
-                            std::cout << "Invalid float literal: multiple decimal separators." << std::endl;
-                            return;
-                        }
-
-                        has_dot = true;
-                        token.type = Token_Type::float_literal;
-                    }
-                    
-                    token.str.push_back(file_contents[index]);
-                    index += 1;
-                }
-
-                tokens.push_back(std::move(token));
-                continue;
-            }
-
-            // string literal
-            if(file_contents[index] == '"') {
-                Token token;
-                token.type = Token_Type::string_literal;
-                do {
-                    token.str.push_back(file_contents[index]);
-                    ++index;
-                } while(file_contents[index] != '"' || file_contents[index - 1] == '\\');
-                token.str.push_back('"');
-                ++index;
-                tokens.push_back(std::move(token));
-                continue;
-            }
-
-            if(is_valid_first_identifier(file_contents[index])) {
-                Token token;
-                i64 index_backup = index;
-                token.type = Token_Type::identifier;
-                token.str.push_back(file_contents[index]);
-                index += 1;
-                while(is_valid_identifier(file_contents[index])) {
-                    token.str.push_back(file_contents[index]);
-                    index += 1;
-                }
-
-                if(is_bool_literal(token.str)) {
-                    token.type = Token_Type::bool_literal;
-                } else {
-                    for(i64 i = 0; i < (sizeof(keywords) / sizeof(keywords[0])); ++i) {
-                        if(token.str == keywords[i]) {
-                            token.type = Token_Type::keyword;
-                            break;
-                        }
-                    }
-                }
-
-                tokens.push_back(std::move(token));
-                continue;
-            }
-
-            if(is_operator(file_contents[index])) {
-                Token token;
-                token.type = Token_Type::oper;
-                token.str.push_back(file_contents[index]);
-                index += 1;
-                while(is_operator(file_contents[index])) {
-                    token.str.push_back(file_contents[index]);
-                    index += 1;
-                }
-                tokens.push_back(std::move(token));
-                continue;
-            }
-
-            if(is_separator(file_contents[index])) {
-                Token token;
-                token.type = Token_Type::separator;
-                token.str.push_back(file_contents[index]);
-                tokens.push_back(std::move(token));
-                index += 1;
-                continue;
-            }
-
-            if(file_contents[index] == -1) {
-                break;
-            }
-
-            std::cout << "Unknown symbol " << file_contents[index] << std::endl;
-            return;
-        }
-
-        std::cout << "Lexed file " << path << ". Tokens: \n";
-
-        for(Token& token: tokens) {
-            std::cout << stringify_token_type(token.type) << ": " << token.str << '\n';
-        }
+        
+        Parser parser(file);
+        parser.build_ast();
     }
 }
