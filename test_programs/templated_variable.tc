@@ -1,0 +1,7 @@
+template<typename T>
+i32 v;
+
+fn main() -> void
+{
+  v<i32 >= 4;
+}
