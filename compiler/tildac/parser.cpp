@@ -128,16 +128,10 @@ namespace tildac {
             case Token_Category::separator: return "separator";
             case Token_Category::operator_: return "operator";
             case Token_Category::identifier: return "identifier";
+            case Token_Category::eof: return "eof";
             // case Token_Category::literal: return "literal";
         }
     }
-
-    struct Token {
-        Token_Category category;
-        Token_Type type;
-        // TODO: string interning.
-        std::string name;
-    };
 
     static bool is_whitespace(char32 c) {
         return (c >= 0 & c <= 32) | (c == 127);
@@ -229,6 +223,7 @@ namespace tildac {
             return true;
         }
 
+        // TODO: String interning if it becomes too slow/memory heavy.
         bool try_match_identifier(std::string& out) {
             ignore_whitespace_and_comments();
 
@@ -358,10 +353,19 @@ namespace tildac {
         }
 
         Declaration* try_declaration() {
+            // if(Variable_Declaration* variable_declaration = try_variable_declaration(); variable_declaration) {
+            //     return variable_declaration;
+            // }
+
             if(Function_Declaration* function_declaration = try_function_declaration(); function_declaration) {
                 return function_declaration;
             }
 
+            return nullptr;
+        }
+
+        Variable_Declaration* try_variable_declaration() {
+            // Lexer_State const state_backup = _lexer.get_current_state();
             return nullptr;
         }
 
@@ -380,22 +384,15 @@ namespace tildac {
                 return nullptr;
             }
 
-            if(!_lexer.try_match_separator(Separator::paren_open)) {
-                _lexer.restore_state(state_backup);
-                delete name;
-                return nullptr;
-            }
-
-            // TODO: Parameter list.
-
-            if(!_lexer.try_match_separator(Separator::paren_close)) {
-                _lexer.restore_state(state_backup);
+            Function_Parameter_List* param_list = try_function_parameter_list();
+            if(!param_list) {
                 delete name;
                 return nullptr;
             }
 
             if(!_lexer.try_match_separator(Separator::drill)) {
                 _lexer.restore_state(state_backup);
+                delete param_list;
                 delete name;
                 return nullptr;
             }
@@ -406,6 +403,7 @@ namespace tildac {
                 return_type = new Type_Name();
             } else {
                 _lexer.restore_state(state_backup);
+                delete param_list;
                 delete name;
                 return nullptr;
             }
@@ -415,10 +413,71 @@ namespace tildac {
                 _lexer.restore_state(state_backup);
                 delete name;
                 delete return_type;
+                delete param_list;
                 return nullptr;
             }
 
-            return new Function_Declaration(name, return_type, function_body);
+            return new Function_Declaration(name, param_list, return_type, function_body);
+        }
+
+        Function_Parameter* try_function_parameter() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            
+            Identifier* identifier = nullptr;
+            if(std::string identifier_str; _lexer.try_match_identifier(identifier_str)) {
+                identifier = new Identifier(std::move(identifier_str));
+            } else {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.try_match_separator(Separator::colon)) {
+                delete identifier;
+                return nullptr;
+            }
+
+            // TODO: Implement proper types.
+            Type_Name* type = nullptr;
+            if(std::string parameter_type; _lexer.try_match_identifier(parameter_type)) {
+                type = new Type_Name();
+            } else {
+                _lexer.restore_state(state_backup);
+                delete identifier;
+                return nullptr;
+            }
+
+            return new Function_Parameter(identifier, type);
+        }
+
+        Function_Parameter_List* try_function_parameter_list() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.try_match_separator(Separator::paren_open)) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+            
+            // Match parameters.
+            Function_Parameter_List* param_list = new Function_Parameter_List;;
+            {
+                Lexer_State const param_list_backup = _lexer.get_current_state();
+                do {
+                    Function_Parameter* parameter = try_function_parameter();
+                    if(parameter) {
+                        param_list->append_parameter(parameter);
+                    } else {
+                        _lexer.restore_state(param_list_backup);
+                        break;
+                    }
+                } while(_lexer.try_match_separator(Separator::comma));
+            }
+
+            if(!_lexer.try_match_separator(Separator::paren_close)) {
+                _lexer.restore_state(state_backup);
+                delete param_list;
+                return nullptr;
+            }
+
+            return param_list;
         }
 
         Function_Body* try_function_body() {
@@ -429,7 +488,6 @@ namespace tildac {
             }
         }
     };
-
 
     void parse_file(std::string_view const path) {
         std::cout << "Opening " << path << " for reading" << std::endl;
