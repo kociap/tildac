@@ -31,6 +31,7 @@ namespace tildac {
         kw_return,
         kw_break,
         kw_continue,
+        kw_void,
         kw_bool,
         kw_c8,
         kw_c16,
@@ -62,9 +63,12 @@ namespace tildac {
         colon,
         scope_resolution,
         comma,
+        question,
+        dot,
     };
 
-    // TODO: Add compound operators (+=, -=, etc.).
+    // TODO: Add compound operators (+=, -=, etc.) to the try_match function.
+    // TODO: call operator, array access operator, elvis operator
     enum class Operator {
         plus,
         minus,
@@ -78,6 +82,8 @@ namespace tildac {
         bit_xor,
         logic_negation,
         bit_negation,
+        bit_lshift,
+        bit_rshift,
         equal,
         not_equal,
         less,
@@ -88,6 +94,18 @@ namespace tildac {
         address,
         dereference,
         drill,
+        increment,
+        decrement,
+        compound_plus,
+        compound_minus,
+        compound_multiply,
+        compound_divice,
+        compound_modulo,
+        compound_bit_and,
+        compound_bit_or,
+        compound_bit_xor,
+        compound_bit_lshift,
+        compound_bit_rshift,
     };
 
     enum class Literal {
@@ -144,6 +162,8 @@ namespace tildac {
     class Lexer_State {
     public:
         i64 stream_offset;
+        i64 line;
+        i64 column;
     };
 
     class Lexer {
@@ -152,7 +172,8 @@ namespace tildac {
 
         bool try_match_separator(Separator const separator) {
             static constexpr std::string_view separators[] = {
-                "{", "}", "[", "]", "(", ")", "<", ">", "->", ";", ":", "::", ","
+                "{", "}", "[", "]", "(", ")", "<", ">", "->", ";", ":", "::", ",",
+                "?", "."
             };
 
             ignore_whitespace_and_comments();
@@ -160,7 +181,7 @@ namespace tildac {
             Lexer_State const state_backup = get_current_state();
             std::string_view const str = separators[static_cast<i64>(separator)];
             for(auto i = str.begin(), end = str.end(); i != end; ++i) {
-                if(_stream.get() != *i) {
+                if(get_next() != *i) {
                     restore_state(state_backup);
                     return false;
                 }
@@ -170,8 +191,9 @@ namespace tildac {
 
         bool try_match_operator(Operator const operator_) {
             static constexpr std::string_view operators[] = {
-                "+", "-", "*", "/", "%", "&&", "&", "||", "|", "^", "!", "~", 
-                "==", "!=", "<", ">", "<=", ">=", "=", "@", "*", "->"
+                "+", "-", "*", "/", "%", "&&", "&", "||", "|", "^", "!", "~", "<<", ">>",
+                "==", "!=", "<", ">", "<=", ">=", "=", "@", "*", "->", "++", "--",
+                "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="
             };
 
             ignore_whitespace_and_comments();
@@ -179,7 +201,7 @@ namespace tildac {
             Lexer_State const state_backup = get_current_state();
             std::string_view const str = operators[static_cast<i64>(operator_)];
             for(auto i = str.begin(), end = str.end(); i != end; ++i) {
-                if(_stream.get() != *i) {
+                if(get_next() != *i) {
                     restore_state(state_backup);
                     return false;
                 }
@@ -190,7 +212,7 @@ namespace tildac {
         bool try_match_keyword(Keyword const keyword) {
             static constexpr std::string_view keywords[] = {
                 "fn", "if", "else", "switch", "case" "for", "while", "do", "return", "break", "continue",
-                "bool", "c8", "c16", "c32", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "f32", "f64",
+                "void", "bool", "c8", "c16", "c32", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "f32", "f64",
                 "mut"
             };
 
@@ -199,7 +221,7 @@ namespace tildac {
             Lexer_State const state_backup = get_current_state();
             std::string_view const str = keywords[static_cast<i64>(keyword)];
             for(auto i = str.begin(), end = str.end(); i != end; ++i) {
-                if(_stream.get() != *i) {
+                if(get_next() != *i) {
                     restore_state(state_backup);
                     return false;
                 }
@@ -207,57 +229,51 @@ namespace tildac {
             return true;
         }
 
-        bool try_match_identifier(std::string* const out) {
+        bool try_match_identifier(std::string& out) {
             ignore_whitespace_and_comments();
 
             // No need to backup the lexer state since we can predict whether the next
             // sequence of characters is an identifier using only the first character.
-            char32 const next_char = _stream.peek();
+            char32 const next_char = peek_next();
             if(!is_first_identifier_character(next_char)) {
                 return false;
             }
 
-            _stream.get();
-            if(out) {
-                *out += next_char;
-                for(char32 peek = _stream.peek(); is_identifier_character(peek); peek = _stream.peek()) {
-                    *out += peek;
-                    _stream.get();
-                }
-            } else {
-                while(is_identifier_character(_stream.peek())) {
-                    _stream.get();
-                }
+            get_next();
+            out += next_char;
+            for(char32 peek = peek_next(); is_identifier_character(peek); peek = peek_next()) {
+                out += peek;
+                get_next();
             }
             return true;
         }
 
         bool try_match_eof() {
             ignore_whitespace_and_comments();
-            char32 const next_char = _stream.peek();
+            char32 const next_char = peek_next();
             return next_char == std::char_traits<char>::eof();
         }
 
         void ignore_whitespace_and_comments() {
             while(true) {
-                char32 const next_char = _stream.peek();
+                char32 const next_char = peek_next();
                 if(is_whitespace(next_char)) {
-                    _stream.get();
+                    get_next();
                     continue;
                 }
 
                 if(next_char == U'/') {
-                    _stream.get();
-                    char32 const next_next_char = _stream.peek();
+                    get_next();
+                    char32 const next_next_char = peek_next();
                     if(next_next_char == U'/') {
-                        _stream.get();
-                        while(_stream.get() != U'\n') {}
+                        get_next();
+                        while(get_next() != U'\n') {}
                     } else if(next_next_char == U'*') {
-                        _stream.get();
-                        for(char32 c1 = _stream.get(), c2 = _stream.peek(); c1 != U'*' || c2 != U'/'; c1 = _stream.get(), c2 = _stream.peek()) {}
-                        _stream.get();
+                        get_next();
+                        for(char32 c1 = get_next(), c2 = peek_next(); c1 != U'*' || c2 != U'/'; c1 = get_next(), c2 = _stream.peek()) {}
+                        get_next();
                     } else {
-                        _stream.unget();
+                        unget();
                     }
                     continue;
                 }
@@ -266,17 +282,39 @@ namespace tildac {
             }
         }
 
-
         Lexer_State get_current_state() const {
-            return {_stream.tellg()};
+            return {_stream.tellg(), _line, _column};
         }
 
         void restore_state(Lexer_State const state) {
             _stream.seekg(state.stream_offset, std::ios_base::beg);
+            _line = state.line;
+            _column = state.column;
         }
 
     private:
         std::istream& _stream;
+        i64 _line = 0;
+        i64 _column = 0;
+
+        char32 get_next() {
+            char32 const c = _stream.get();
+            if(c == '\n') {
+                _line += 1;
+                _column = 0;
+            } else {
+                _column += 1;
+            }
+            return c;
+        }
+
+        char32 peek_next() {
+            return _stream.peek();
+        }
+
+        void unget() {
+            _stream.unget();
+        }
     };
 
     class Parser {
@@ -335,7 +373,7 @@ namespace tildac {
             }
 
             Identifier* name = nullptr;
-            if(std::string fn_name; _lexer.try_match_identifier(&fn_name)) {
+            if(std::string fn_name; _lexer.try_match_identifier(fn_name)) {
                 name = new Identifier(std::move(fn_name));
             } else {
                 _lexer.restore_state(state_backup);
@@ -364,7 +402,7 @@ namespace tildac {
 
             // TODO: Implement proper types.
             Type_Name* return_type = nullptr;
-            if(std::string return_name; _lexer.try_match_identifier(&return_name)) {
+            if(std::string return_name; _lexer.try_match_identifier(return_name)) {
                 return_type = new Type_Name();
             } else {
                 _lexer.restore_state(state_backup);
