@@ -6,135 +6,97 @@
 
 #include <vector>
 #include <iostream>
+#include <string_view>
 #include <string>
 #include <fstream>
 
 namespace tildac {
-    enum class Token_Category {
-        eof,
-        keyword,
-        separator,
-        operator_,
-        identifier,
-        // literal,
-    };
-
-    enum class Keyword {
-        kw_fn,
-        kw_if,
-        kw_else,
-        kw_switch,
-        kw_case,
-        kw_for,
-        kw_while,
-        kw_do,
-        kw_return,
-        kw_break,
-        kw_continue,
-        kw_void,
-        kw_bool,
-        kw_c8,
-        kw_c16,
-        kw_c32,
-        kw_i8,
-        kw_u8,
-        kw_i16,
-        kw_u16,
-        kw_i32,
-        kw_u32,
-        kw_i64,
-        kw_u64,
-        kw_f32,
-        kw_f64,
-        kw_mut,
-    };
-
-    enum class Separator {
-        brace_open,
-        brace_close,
-        bracket_open,
-        bracket_close,
-        paren_open,
-        paren_close,
-        angle_open,
-        angle_close,
-        drill,
-        semicolon,
-        colon,
-        scope_resolution,
-        comma,
-        question,
-        dot,
-    };
-
-    // TODO: Add compound operators (+=, -=, etc.) to the try_match function.
     // TODO: call operator, array access operator, elvis operator
-    enum class Operator {
-        plus,
-        minus,
-        multiply,
-        divide,
-        modulo,
-        logic_and,
-        bit_and,
-        logic_or,
-        bit_or,
-        bit_xor,
-        logic_negation,
-        bit_negation,
-        bit_lshift,
-        bit_rshift,
-        equal,
-        not_equal,
-        less,
-        greater,
-        less_equal,
-        greater_equal,
-        assign,
-        address,
-        dereference,
-        drill,
-        increment,
-        decrement,
-        compound_plus,
-        compound_minus,
-        compound_multiply,
-        compound_divice,
-        compound_modulo,
-        compound_bit_and,
-        compound_bit_or,
-        compound_bit_xor,
-        compound_bit_lshift,
-        compound_bit_rshift,
-    };
 
-    enum class Literal {
-        bool_literal,
-        integer_literal,
-        float_literal,
-        string_literal,
-    };
 
-    union Token_Type {
-        Separator separator;
-        Keyword keyword;
-        Literal literal;
-        Operator operator_;
-    };
-
-    static std::string_view stringify_token_category(Token_Category t) {
-        switch(t) {
-            case Token_Category::keyword: return "keyword";
-            case Token_Category::separator: return "separator";
-            case Token_Category::operator_: return "operator";
-            case Token_Category::identifier: return "identifier";
-            case Token_Category::eof: return "eof";
-            // case Token_Category::literal: return "literal";
-        }
-    }
+    // keywords
+    static constexpr std::string_view token_fn = "fn";
+    static constexpr std::string_view token_if = "if";
+    static constexpr std::string_view token_else = "else";
+    static constexpr std::string_view token_switch = "switch";
+    static constexpr std::string_view token_case = "case";
+    static constexpr std::string_view token_for = "for";
+    static constexpr std::string_view token_while = "while";
+    static constexpr std::string_view token_do = "do";
+    static constexpr std::string_view token_return = "return";
+    static constexpr std::string_view token_break = "break";
+    static constexpr std::string_view token_continue = "continue";
+    static constexpr std::string_view token_mut = "mut";
+    // builtin types
+    static constexpr std::string_view token_void = "void";
+    static constexpr std::string_view token_bool = "bool";
+    static constexpr std::string_view token_c8 = "c8";
+    static constexpr std::string_view token_c16 = "c16";
+    static constexpr std::string_view token_c32 = "c32";
+    static constexpr std::string_view token_i8 = "i8";
+    static constexpr std::string_view token_u8 = "u8";
+    static constexpr std::string_view token_i16 = "i16";
+    static constexpr std::string_view token_u16 = "u16";
+    static constexpr std::string_view token_i32 = "i32";
+    static constexpr std::string_view token_u32 = "u32";
+    static constexpr std::string_view token_i64 = "i64";
+    static constexpr std::string_view token_u64 = "u64";
+    static constexpr std::string_view token_f32 = "f32";
+    static constexpr std::string_view token_f64 = "f64";
+    // separators and operators
+    static constexpr std::string_view token_brace_open = "{";
+    static constexpr std::string_view token_brace_close = "}";
+    static constexpr std::string_view token_bracket_open = "[";
+    static constexpr std::string_view token_bracket_close = "]";
+    static constexpr std::string_view token_paren_open = "(";
+    static constexpr std::string_view token_paren_close = ")";
+    static constexpr std::string_view token_angle_open = "<";
+    static constexpr std::string_view token_angle_close = ">";
+    static constexpr std::string_view token_semicolon = ";";
+    static constexpr std::string_view token_colon = ":";
+    static constexpr std::string_view token_scope_resolution = "::";
+    static constexpr std::string_view token_comma = ",";
+    static constexpr std::string_view token_question = "?";
+    static constexpr std::string_view token_dot = ".";
+    static constexpr std::string_view token_plus = "+";
+    static constexpr std::string_view token_minus = "-";
+    static constexpr std::string_view token_multiply = "*";
+    static constexpr std::string_view token_divide = "/";
+    static constexpr std::string_view token_modulo = "%";
+    static constexpr std::string_view token_logic_and = "&&";
+    static constexpr std::string_view token_bit_and = "&";
+    static constexpr std::string_view token_logic_or = "||";
+    static constexpr std::string_view token_bit_or = "|";
+    static constexpr std::string_view token_bit_xor = "^";
+    static constexpr std::string_view token_logic_negation = "!";
+    static constexpr std::string_view token_bit_negation = "~";
+    static constexpr std::string_view token_bit_lshift = "<<";
+    static constexpr std::string_view token_bit_rshift = ">>";
+    static constexpr std::string_view token_equal = "==";
+    static constexpr std::string_view token_not_equal = "!=";
+    static constexpr std::string_view token_less = "<";
+    static constexpr std::string_view token_greater = ">";
+    static constexpr std::string_view token_less_equal = "<=";
+    static constexpr std::string_view token_greater_equal = ">=";
+    static constexpr std::string_view token_assign = "=";
+    static constexpr std::string_view token_address = "@";
+    static constexpr std::string_view token_dereference = "*";
+    static constexpr std::string_view token_drill = "->";
+    static constexpr std::string_view token_increment = "++";
+    static constexpr std::string_view token_decrement = "--";
+    static constexpr std::string_view token_compound_plus = "+=";
+    static constexpr std::string_view token_compound_minus = "-=";
+    static constexpr std::string_view token_compound_multiply = "*=";
+    static constexpr std::string_view token_compound_divice = "/=";
+    static constexpr std::string_view token_compound_modulo = "%=";
+    static constexpr std::string_view token_compound_bit_and = "&=";
+    static constexpr std::string_view token_compound_bit_or = "|=";
+    static constexpr std::string_view token_compound_bit_xor = "^=";
+    static constexpr std::string_view token_compound_bit_lshift = "<<=";
+    static constexpr std::string_view token_compound_bit_rshift = ">>=";
 
     static bool is_whitespace(char32 c) {
-        return (c >= 0 & c <= 32) | (c == 127);
+        return (c <= 32) | (c == 127);
     }
 
     static bool is_digit(char32 c) {
@@ -164,58 +126,12 @@ namespace tildac {
     public:
         Lexer(std::istream& file): _stream(file) {}
 
-        bool try_match_separator(Separator const separator) {
-            static constexpr std::string_view separators[] = {
-                "{", "}", "[", "]", "(", ")", "<", ">", "->", ";", ":", "::", ",",
-                "?", "."
-            };
-
+        bool try_match(std::string_view const string) {
             ignore_whitespace_and_comments();
 
             Lexer_State const state_backup = get_current_state();
-            std::string_view const str = separators[static_cast<i64>(separator)];
-            for(auto i = str.begin(), end = str.end(); i != end; ++i) {
-                if(get_next() != *i) {
-                    restore_state(state_backup);
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        bool try_match_operator(Operator const operator_) {
-            static constexpr std::string_view operators[] = {
-                "+", "-", "*", "/", "%", "&&", "&", "||", "|", "^", "!", "~", "<<", ">>",
-                "==", "!=", "<", ">", "<=", ">=", "=", "@", "*", "->", "++", "--",
-                "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="
-            };
-
-            ignore_whitespace_and_comments();
-
-            Lexer_State const state_backup = get_current_state();
-            std::string_view const str = operators[static_cast<i64>(operator_)];
-            for(auto i = str.begin(), end = str.end(); i != end; ++i) {
-                if(get_next() != *i) {
-                    restore_state(state_backup);
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        bool try_match_keyword(Keyword const keyword) {
-            static constexpr std::string_view keywords[] = {
-                "fn", "if", "else", "switch", "case" "for", "while", "do", "return", "break", "continue",
-                "void", "bool", "c8", "c16", "c32", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "f32", "f64",
-                "mut"
-            };
-
-            ignore_whitespace_and_comments();
-
-            Lexer_State const state_backup = get_current_state();
-            std::string_view const str = keywords[static_cast<i64>(keyword)];
-            for(auto i = str.begin(), end = str.end(); i != end; ++i) {
-                if(get_next() != *i) {
+            for(char c: string) {
+                if(get_next() != c) {
                     restore_state(state_backup);
                     return false;
                 }
@@ -371,7 +287,7 @@ namespace tildac {
 
         Function_Declaration* try_function_declaration() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            if(!_lexer.try_match_keyword(Keyword::kw_fn)) {
+            if(!_lexer.try_match(token_fn)) {
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
@@ -390,7 +306,7 @@ namespace tildac {
                 return nullptr;
             }
 
-            if(!_lexer.try_match_separator(Separator::drill)) {
+            if(!_lexer.try_match(token_drill)) {
                 _lexer.restore_state(state_backup);
                 delete param_list;
                 delete name;
@@ -431,7 +347,7 @@ namespace tildac {
                 return nullptr;
             }
 
-            if(!_lexer.try_match_separator(Separator::colon)) {
+            if(!_lexer.try_match(token_colon)) {
                 delete identifier;
                 return nullptr;
             }
@@ -451,7 +367,7 @@ namespace tildac {
 
         Function_Parameter_List* try_function_parameter_list() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            if(!_lexer.try_match_separator(Separator::paren_open)) {
+            if(!_lexer.try_match(token_paren_open)) {
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
@@ -468,10 +384,10 @@ namespace tildac {
                         _lexer.restore_state(param_list_backup);
                         break;
                     }
-                } while(_lexer.try_match_separator(Separator::comma));
+                } while(_lexer.try_match(token_comma));
             }
 
-            if(!_lexer.try_match_separator(Separator::paren_close)) {
+            if(!_lexer.try_match(token_paren_close)) {
                 _lexer.restore_state(state_backup);
                 delete param_list;
                 return nullptr;
@@ -481,7 +397,7 @@ namespace tildac {
         }
 
         Function_Body* try_function_body() {
-            if(_lexer.try_match_separator(Separator::brace_open) && _lexer.try_match_separator(Separator::brace_close)) {
+            if(_lexer.try_match(token_brace_open) && _lexer.try_match(token_brace_close)) {
                 return new Function_Body;
             } else {
                 return nullptr;
