@@ -314,13 +314,22 @@ namespace tildac {
                 return nullptr;
             }
 
+            Owning_Ptr<Expression> initializer = nullptr;
+            if(_lexer.match(token_assign)) {
+                initializer = try_expression();
+                if(!initializer) {
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
+            }
+
             if(!_lexer.match(token_semicolon)) {
                 set_error("Expected `;` after variable declaration.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
 
-            return new Variable_Declaration(var_type.release(), var_name.release(), nullptr);
+            return new Variable_Declaration(var_type.release(), var_name.release(), initializer.release());
         }
 
         Function_Declaration* try_function_declaration() {
@@ -462,6 +471,11 @@ namespace tildac {
                     continue;
                 }
 
+                if(Expression_Statement* expr_stmt = try_expression_statement()) {
+                    statements->append(expr_stmt);
+                    continue;
+                }
+
                 return statements;
             }
         }
@@ -518,6 +532,32 @@ namespace tildac {
                 return new Qualified_Type(name);
             } else {
                 set_error("Expected identifier");
+                return nullptr;
+            }
+        }
+
+        Expression_Statement* try_expression_statement() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            Owning_Ptr expression = try_expression();
+            if(!expression) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(_lexer.match(token_semicolon)) {
+                set_error("Expected `;` at the end of statement");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new Expression_Statement(expression.release());
+        }
+
+        Expression* try_expression() {
+            if(std::string name; _lexer.match_identifier(name)) {
+                Identifier* identifier = new Identifier(name);
+                return new Identifier_Expression(identifier);
+            } else {
                 return nullptr;
             }
         }

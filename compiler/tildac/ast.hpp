@@ -25,13 +25,6 @@ namespace tildac {
         virtual void print(std::ostream& stream, Indent indent) const = 0;
     };
 
-    class Expression: public Syntax_Tree_Node {
-    public:
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Expression\n";
-        }
-    };
-
     class Identifier: public Syntax_Tree_Node {
     public:
         Identifier(std::string const& string): _name(string) {}
@@ -44,6 +37,21 @@ namespace tildac {
 
     private:
         std::string _name;
+    };
+
+    class Expression: public Syntax_Tree_Node {};
+
+    class Identifier_Expression: public Expression {
+    public:
+        Identifier_Expression(Identifier* identifier): _identifier(identifier) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Node: Identifier_Expression\n";
+            _identifier->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Identifier> _identifier;
     };
 
     class Type: public Syntax_Tree_Node {};
@@ -133,12 +141,25 @@ namespace tildac {
         Declaration_Statement(Variable_Declaration* var_decl): _var_decl(var_decl) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Declaration Statement (Variable Declaration)\n";
+            stream << indent << "Node: Declaration_Statement (Variable Declaration)\n";
             _var_decl->print(stream, Indent{indent.indent_count + 1});
         }
 
     private:
         Owning_Ptr<Variable_Declaration> _var_decl;
+    };
+
+    class Expression_Statement: public Statement {
+    public:
+        Expression_Statement(Expression* expression): _expr(expression) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Node: Expression_Statement\n";
+            _expr->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Expression> _expr;
     };
 
     class Statement_List: public Syntax_Tree_Node {

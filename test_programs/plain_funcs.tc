@@ -1,6 +1,6 @@
 fn mul(x: i32) -> void {
-    var variable: i32;
-    var variable: T<U<u64>, V<i64>>;
+    var variable0: i32 = a;
+    var variable1: T<U<u64>, V<i64>>= variable0;
 }
 
 fn main(argc : i64, argv:c8) -> i32 {
