@@ -126,7 +126,7 @@ namespace tildac {
     public:
         Lexer(std::istream& file): _stream(file) {}
 
-        bool try_match(std::string_view const string) {
+        bool match(std::string_view const string) {
             ignore_whitespace_and_comments();
 
             Lexer_State const state_backup = get_current_state();
@@ -140,7 +140,7 @@ namespace tildac {
         }
 
         // TODO: String interning if it becomes too slow/memory heavy.
-        bool try_match_identifier(std::string& out) {
+        bool match_identifier(std::string& out) {
             ignore_whitespace_and_comments();
 
             // No need to backup the lexer state since we can predict whether the next
@@ -159,7 +159,7 @@ namespace tildac {
             return true;
         }
 
-        bool try_match_eof() {
+        bool match_eof() {
             ignore_whitespace_and_comments();
             char32 const next_char = peek_next();
             return next_char == std::char_traits<char>::eof();
@@ -232,42 +232,39 @@ namespace tildac {
     public:
         Parser(std::istream& stream): _lexer(stream) {}
 
-        void build_ast() {
-            while(true) {
-                if(Declaration_Sequence* decl_seq = try_declaration_sequence(); decl_seq) {
-                    decl_seq->print(std::cout, Indent{0});
-                    delete decl_seq;
+        bool build_ast() {
+            while(!_lexer.match_eof()) {
+                if(Declaration* declaration = try_declaration(); declaration) {
+                    declaration->print(std::cout, Indent{0});
+                    delete declaration;
+                } else {
+                    return false;
                 }
+            }
+            return true;
+        }
 
-                if(_lexer.try_match_eof()) {
-                    break;
-                }
-            }   
+        [[nodiscard]] Parse_Error get_last_error() const {
+            return _last_error;
         }
 
     private:
         Lexer _lexer;
-        
-        Declaration_Sequence* try_declaration_sequence() {
-            Declaration_Sequence* const declaration_sequence = new Declaration_Sequence;
-            while(true) {
-                Declaration* declaration = try_declaration();
-                if(declaration) {
-                    declaration_sequence->append_declaration(declaration);
-                } else {
-                    break;
-                }
-            }
+        Parse_Error _last_error;
 
-            i64 const declaration_count = declaration_sequence->get_declarations_count();
-            if(declaration_count > 0) {
-                return declaration_sequence;
-            } else {
-                delete declaration_sequence;
-                return nullptr;
-            }
+        void set_error(std::string_view const message, Lexer_State const state) {
+            _last_error.message = message;
+            _last_error.line = state.line;
+            _last_error.column = state.column;
         }
 
+        void set_error(std::string_view const message) {
+            Lexer_State const state = _lexer.get_current_state();
+            _last_error.message = message;
+            _last_error.line = state.line;
+            _last_error.column = state.column;
+        }
+        
         Declaration* try_declaration() {
             // if(Variable_Declaration* variable_declaration = try_variable_declaration(); variable_declaration) {
             //     return variable_declaration;
@@ -287,119 +284,122 @@ namespace tildac {
 
         Function_Declaration* try_function_declaration() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            if(!_lexer.try_match(token_fn)) {
+            if(!_lexer.match(token_fn)) {
+                set_error("Expected kewyord `fn`.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
 
-            Identifier* name = nullptr;
-            if(std::string fn_name; _lexer.try_match_identifier(fn_name)) {
+            Owning_Ptr<Identifier> name = nullptr;
+            if(std::string fn_name; _lexer.match_identifier(fn_name)) {
                 name = new Identifier(std::move(fn_name));
             } else {
+                set_error("Expected function name.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
 
-            Function_Parameter_List* param_list = try_function_parameter_list();
+            Owning_Ptr param_list = try_function_parameter_list();
             if(!param_list) {
-                delete name;
+                _lexer.restore_state(state_backup);
                 return nullptr;
             }
 
-            if(!_lexer.try_match(token_drill)) {
+            if(!_lexer.match(token_drill)) {
+                set_error("Expected `->`.");
                 _lexer.restore_state(state_backup);
-                delete param_list;
-                delete name;
                 return nullptr;
             }
 
             // TODO: Implement proper types.
-            Type_Name* return_type = nullptr;
-            if(std::string return_name; _lexer.try_match_identifier(return_name)) {
+            Owning_Ptr<Type_Name> return_type = nullptr;
+            if(std::string return_name; _lexer.match_identifier(return_name)) {
                 return_type = new Type_Name();
             } else {
+                set_error("Expected return type.");
                 _lexer.restore_state(state_backup);
-                delete param_list;
-                delete name;
                 return nullptr;
             }
 
-            Function_Body* function_body = try_function_body();
+            Owning_Ptr function_body = try_function_body();
             if(!function_body) {
                 _lexer.restore_state(state_backup);
-                delete name;
-                delete return_type;
-                delete param_list;
                 return nullptr;
             }
 
-            return new Function_Declaration(name, param_list, return_type, function_body);
+            return new Function_Declaration(name.release(), param_list.release(), return_type.release(), function_body.release());
         }
 
         Function_Parameter* try_function_parameter() {
             Lexer_State const state_backup = _lexer.get_current_state();
             
-            Identifier* identifier = nullptr;
-            if(std::string identifier_str; _lexer.try_match_identifier(identifier_str)) {
+            Owning_Ptr<Identifier> identifier = nullptr;
+            if(std::string identifier_str; _lexer.match_identifier(identifier_str)) {
                 identifier = new Identifier(std::move(identifier_str));
             } else {
+                set_error("Expected parameter name.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
 
-            if(!_lexer.try_match(token_colon)) {
-                delete identifier;
+            if(!_lexer.match(token_colon)) {
+                set_error("Expected `:`.");
                 return nullptr;
             }
 
             // TODO: Implement proper types.
             Type_Name* type = nullptr;
-            if(std::string parameter_type; _lexer.try_match_identifier(parameter_type)) {
+            if(std::string parameter_type; _lexer.match_identifier(parameter_type)) {
                 type = new Type_Name();
             } else {
+                set_error("Expected parameter type.");
                 _lexer.restore_state(state_backup);
-                delete identifier;
                 return nullptr;
             }
 
-            return new Function_Parameter(identifier, type);
+            return new Function_Parameter(identifier.release(), type);
         }
 
         Function_Parameter_List* try_function_parameter_list() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            if(!_lexer.try_match(token_paren_open)) {
+            if(!_lexer.match(token_paren_open)) {
+                set_error("Expected `(`.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
+            }
+
+            if(_lexer.match(token_paren_close)) {
+                return new Function_Parameter_List;
             }
             
             // Match parameters.
-            Function_Parameter_List* param_list = new Function_Parameter_List;;
+            Owning_Ptr param_list = new Function_Parameter_List;
             {
                 Lexer_State const param_list_backup = _lexer.get_current_state();
                 do {
-                    Function_Parameter* parameter = try_function_parameter();
-                    if(parameter) {
+                    if(Function_Parameter* parameter = try_function_parameter(); parameter) {
                         param_list->append_parameter(parameter);
                     } else {
                         _lexer.restore_state(param_list_backup);
-                        break;
+                        return nullptr;
                     }
-                } while(_lexer.try_match(token_comma));
+                } while(_lexer.match(token_comma));
             }
 
-            if(!_lexer.try_match(token_paren_close)) {
+            if(!_lexer.match(token_paren_close)) {
+                set_error("Expected `)` after function parameter list.");
                 _lexer.restore_state(state_backup);
-                delete param_list;
                 return nullptr;
             }
 
-            return param_list;
+            return param_list.release();
         }
 
         Function_Body* try_function_body() {
-            if(_lexer.try_match(token_brace_open) && _lexer.try_match(token_brace_close)) {
+            if(_lexer.match(token_brace_open) && _lexer.match(token_brace_close)) {
                 return new Function_Body;
             } else {
+                set_error("Expected function body.");
                 return nullptr;
             }
         }
@@ -415,6 +415,9 @@ namespace tildac {
         }
         
         Parser parser(file);
-        parser.build_ast();
+        if(!parser.build_ast()) {
+            Parse_Error error = parser.get_last_error();
+            std::cout << path << " (" << error.line << ":" << error.column << ") error: " << error.message << '\n';
+        }
     }
 }
