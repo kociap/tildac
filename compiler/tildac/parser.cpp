@@ -15,18 +15,19 @@ namespace tildac {
 
 
     // keywords
-    static constexpr std::string_view token_fn = "fn";
-    static constexpr std::string_view token_if = "if";
-    static constexpr std::string_view token_else = "else";
-    static constexpr std::string_view token_switch = "switch";
-    static constexpr std::string_view token_case = "case";
-    static constexpr std::string_view token_for = "for";
-    static constexpr std::string_view token_while = "while";
-    static constexpr std::string_view token_do = "do";
-    static constexpr std::string_view token_return = "return";
-    static constexpr std::string_view token_break = "break";
-    static constexpr std::string_view token_continue = "continue";
-    static constexpr std::string_view token_mut = "mut";
+    static constexpr std::string_view kw_fn = "fn";
+    static constexpr std::string_view kw_if = "if";
+    static constexpr std::string_view kw_else = "else";
+    static constexpr std::string_view kw_switch = "switch";
+    static constexpr std::string_view kw_case = "case";
+    static constexpr std::string_view kw_for = "for";
+    static constexpr std::string_view kw_while = "while";
+    static constexpr std::string_view kw_do = "do";
+    static constexpr std::string_view kw_return = "return";
+    static constexpr std::string_view kw_break = "break";
+    static constexpr std::string_view kw_continue = "continue";
+    static constexpr std::string_view kw_mut = "mut";
+    static constexpr std::string_view kw_var = "var";
     // builtin types
     static constexpr std::string_view token_void = "void";
     static constexpr std::string_view token_bool = "bool";
@@ -253,22 +254,28 @@ namespace tildac {
         Parse_Error _last_error;
 
         void set_error(std::string_view const message, Lexer_State const state) {
-            _last_error.message = message;
-            _last_error.line = state.line;
-            _last_error.column = state.column;
+            if(state.stream_offset > _last_error.file_offset) {
+                _last_error.message = message;
+                _last_error.line = state.line;
+                _last_error.column = state.column;
+                _last_error.file_offset = state.stream_offset;
+            }
         }
 
         void set_error(std::string_view const message) {
             Lexer_State const state = _lexer.get_current_state();
-            _last_error.message = message;
-            _last_error.line = state.line;
-            _last_error.column = state.column;
+            if(state.stream_offset > _last_error.file_offset) {
+                _last_error.message = message;
+                _last_error.line = state.line;
+                _last_error.column = state.column;
+                _last_error.file_offset = state.stream_offset;
+            }
         }
         
         Declaration* try_declaration() {
-            // if(Variable_Declaration* variable_declaration = try_variable_declaration(); variable_declaration) {
-            //     return variable_declaration;
-            // }
+            if(Variable_Declaration* variable_declaration = try_variable_declaration(); variable_declaration) {
+                return variable_declaration;
+            }
 
             if(Function_Declaration* function_declaration = try_function_declaration(); function_declaration) {
                 return function_declaration;
@@ -278,13 +285,47 @@ namespace tildac {
         }
 
         Variable_Declaration* try_variable_declaration() {
-            // Lexer_State const state_backup = _lexer.get_current_state();
-            return nullptr;
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.match(kw_var)) {
+                set_error("Expected keyword `var`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr<Identifier> var_name = nullptr;
+            if(std::string identifier; _lexer.match_identifier(identifier)) {
+                var_name = new Identifier(std::move(identifier));
+            } else {
+                set_error("Expected variable name.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_colon)) {
+                set_error("Expected `:` after variable name.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr var_type = try_type();
+            if(!var_type) {
+                set_error("Expected type.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_semicolon)) {
+                set_error("Expected `;` after variable declaration.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new Variable_Declaration(var_type.release(), var_name.release(), nullptr);
         }
 
         Function_Declaration* try_function_declaration() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            if(!_lexer.match(token_fn)) {
+            if(!_lexer.match(kw_fn)) {
                 set_error("Expected kewyord `fn`.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
@@ -311,7 +352,7 @@ namespace tildac {
                 return nullptr;
             }
 
-            Owning_Ptr return_type = try_type_name();
+            Owning_Ptr return_type = try_type();
             if(!return_type) {
                 set_error("Expected return type.");
                 _lexer.restore_state(state_backup);
@@ -344,7 +385,7 @@ namespace tildac {
                 return nullptr;
             }
 
-            Owning_Ptr parameter_type = try_type_name();
+            Owning_Ptr parameter_type = try_type();
             if(!parameter_type) {
                 set_error("Expected parameter type.");
                 _lexer.restore_state(state_backup);
@@ -390,20 +431,93 @@ namespace tildac {
         }
 
         Function_Body* try_function_body() {
-            if(_lexer.match(token_brace_open) && _lexer.match(token_brace_close)) {
-                return new Function_Body;
+            if(!_lexer.match(token_brace_open)) {
+                set_error("Expected `{` at the beginning of function body.");
+                return nullptr;
+            }
+
+            if(_lexer.match(token_brace_close)) {
+                return new Function_Body(nullptr);
+            }
+
+            Owning_Ptr statements = try_statement_list();
+            if(statements->size() == 0) {
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_brace_close)) {
+                set_error("Expected `}` at the end of the function body.");
+                return nullptr;
+            }
+
+            return new Function_Body(statements.release());
+        }
+
+        Statement_List* try_statement_list() {
+            Statement_List* statements = new Statement_List;
+            while(true) {
+                if(Variable_Declaration* decl = try_variable_declaration(); decl) {
+                    Declaration_Statement* decl_stmt = new Declaration_Statement(decl);
+                    statements->append(decl_stmt);
+                    continue;
+                }
+
+                return statements;
+            }
+        }
+
+        Type* try_type() {
+            if(Template_ID* template_id = try_template_id()) {
+                return template_id;
+            } else if(Qualified_Type* qualified_type = try_qualified_type()) {
+                return qualified_type;
             } else {
-                set_error("Expected function body.");
                 return nullptr;
             }
         }
 
-        Type_Name* try_type_name() {
-            std::string name;
-            if(_lexer.match_identifier(name)) {
-                return new Type_Name(std::move(name));
+        Template_ID* try_template_id() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+
+            Owning_Ptr qualified_type = try_qualified_type();
+            if(!qualified_type) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_angle_open)) {
+                set_error("Expected `<`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(_lexer.match(token_angle_close)) {
+                return new Template_ID(qualified_type.release());
+            }
+
+            Owning_Ptr template_id = new Template_ID(qualified_type.release());
+            do {
+                if(Type* type = try_type()) {
+                    template_id->append(type);
+                } else {
+                    return nullptr;
+                }
+            } while(_lexer.match(token_comma));
+
+            if(!_lexer.match(token_angle_close)) {
+                set_error("Expected `>`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return template_id.release();
+        }
+
+        Qualified_Type* try_qualified_type() {
+            if(std::string name; _lexer.match_identifier(name)) {
+                return new Qualified_Type(name);
             } else {
-                set_error("Expected identifier.");
+                set_error("Expected identifier");
                 return nullptr;
             }
         }

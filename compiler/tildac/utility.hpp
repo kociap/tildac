@@ -43,7 +43,7 @@ namespace tildac {
             delete _pointer;
         }
 
-        [[nodiscard]] operator bool() {
+        [[nodiscard]] operator bool() const {
             return _pointer;
         }
 

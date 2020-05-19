@@ -46,53 +46,74 @@ namespace tildac {
         std::string _name;
     };
 
-    class Type_Name: public Syntax_Tree_Node {
+    class Type: public Syntax_Tree_Node {};
+
+    class Qualified_Type: public Type {
     public:
-        Type_Name(std::string const& name): _name(name) {}
-        Type_Name(std::string&& name): _name(std::move(name)) {}
+        Qualified_Type(std::string name): _name(name) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Type Name\n";
+            stream << indent << "Node: Qualified_Type\n";
             stream << Indent{indent.indent_count + 1} << "Type: " << _name << '\n';
         }
-    
+
     private:
         std::string _name;
+    };
+
+    class Template_ID: public Type {
+    public:
+        Template_ID(Qualified_Type* qualified_type): _qualified_type(qualified_type) {}
+
+        void append(Type* nested_type) {
+            _nested_types.emplace_back(nested_type);
+        }
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Node: Template_ID\n";
+            stream << Indent{indent.indent_count + 1} << "Type:\n";
+            _qualified_type->print(stream, Indent{indent.indent_count + 1});
+            stream << Indent{indent.indent_count + 1} << "Nested Types:\n";
+            for(auto& nested_type: _nested_types) {
+                nested_type->print(stream, Indent{indent.indent_count + 2});
+            }
+        }
+
+    private:
+        std::vector<Owning_Ptr<Type>> _nested_types;
+        Owning_Ptr<Qualified_Type> _qualified_type;
     };
 
     class Declaration: public Syntax_Tree_Node {};
 
     class Declaration_Sequence: public Syntax_Tree_Node {
     public:
-        virtual ~Declaration_Sequence() override {
-            for(Declaration* decl: _decls) {
-                delete decl;
-            }
+        void append(Declaration* const declaration) {
+            _decls.emplace_back(declaration);
         }
 
-        void append_declaration(Declaration* const declaration) {
-            _decls.push_back(declaration);
-        }
-
-        i64 get_declarations_count() const {
+        [[nodiscard]] i64 size() const {
             return _decls.size();
         }
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            for(Declaration* decl: _decls) {
+            for(auto& decl: _decls) {
                 decl->print(stream, indent);
             }
         }
 
     private:
-        std::vector<Declaration*> _decls;
+        std::vector<Owning_Ptr<Declaration>> _decls;
     };
 
     class Variable_Declaration: public Declaration {
     public:
+        Variable_Declaration(Type* type, Identifier* identifier, Expression* initializer)
+        : _Type(type), _identifier(identifier), _initializer(initializer) {}
+
         virtual void print(std::ostream& stream, Indent const indent) const override {
             stream << indent << "Node: Variable Declaration\n";
-            _type_name->print(stream, {indent.indent_count + 1});
+            _Type->print(stream, {indent.indent_count + 1});
             _identifier->print(stream, {indent.indent_count + 1});
             if(_initializer) {
                 _initializer->print(stream, {indent.indent_count + 1});
@@ -100,14 +121,49 @@ namespace tildac {
         }
 
     private:
-        Type_Name* _type_name = nullptr;
-        Identifier* _identifier = nullptr;
-        Expression* _initializer = nullptr;
+        Owning_Ptr<Type> _Type = nullptr;
+        Owning_Ptr<Identifier> _identifier = nullptr;
+        Owning_Ptr<Expression> _initializer = nullptr;
+    };
+
+    class Statement: public Syntax_Tree_Node {};
+
+    class Declaration_Statement: public Statement {
+    public:
+        Declaration_Statement(Variable_Declaration* var_decl): _var_decl(var_decl) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Node: Declaration Statement (Variable Declaration)\n";
+            _var_decl->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Variable_Declaration> _var_decl;
+    };
+
+    class Statement_List: public Syntax_Tree_Node {
+    public:
+        void append(Statement* const declaration) {
+            _statements.emplace_back(declaration);
+        }
+
+        [[nodiscard]] i64 size() const {
+            return _statements.size();
+        }
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            for(auto& statement: _statements) {
+                statement->print(stream, indent);
+            }
+        }
+
+    private:
+        std::vector<Owning_Ptr<Statement>> _statements;
     };
 
     class Function_Parameter: public Syntax_Tree_Node {
     public:
-        Function_Parameter(Identifier* identifier, Type_Name* type): _identifier(identifier), _type(type) {}
+        Function_Parameter(Identifier* identifier, Type* type): _identifier(identifier), _type(type) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
             stream << indent << "Node: Function Parameter\n";
@@ -117,7 +173,7 @@ namespace tildac {
 
     private:
         Identifier* _identifier;
-        Type_Name* _type;
+        Type* _type;
     };
 
     class Function_Parameter_List: public Syntax_Tree_Node {
@@ -143,14 +199,22 @@ namespace tildac {
 
     class Function_Body: public Syntax_Tree_Node {
     public:
+        Function_Body(Statement_List* statement_list): _statements(statement_list) {}
+
         virtual void print(std::ostream& stream, Indent const indent) const override {
             stream << indent << "Node: Function Body\n";
+            if(_statements) {
+                _statements->print(stream, Indent{indent.indent_count + 1});
+            }
         }
+
+    private:
+        Owning_Ptr<Statement_List> _statements;
     };
 
     class Function_Declaration: public Declaration {
     public:
-        Function_Declaration(Identifier* name, Function_Parameter_List* function_parameter_list, Type_Name* return_type, Function_Body* body): 
+        Function_Declaration(Identifier* name, Function_Parameter_List* function_parameter_list, Type* return_type, Function_Body* body): 
             _name(name), _parameter_list(function_parameter_list), _return_type(return_type), _body(body) {}
 
         virtual ~Function_Declaration() override {
@@ -175,7 +239,7 @@ namespace tildac {
     private:
         Identifier* _name;
         Function_Parameter_List* _parameter_list;
-        Type_Name* _return_type;
+        Type* _return_type;
         Function_Body* _body;
     };
 } // namespace tildac

@@ -1,0 +1,11 @@
+fn mul(x: i32) -> void {
+    var variable: i32;
+    var variable: T<U<u64>, V<i64>>;
+}
+
+fn main(argc : i64, argv:c8) -> i32 {
+    // Comment
+    /**/
+    /* Multiline
+     * comment */
+}

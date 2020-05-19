@@ -9,6 +9,7 @@ namespace tildac {
         std::string message;
         i64 line;
         i64 column;
+        i64 file_offset;
     };
 
     void parse_file(std::string_view path);
