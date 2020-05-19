@@ -311,11 +311,8 @@ namespace tildac {
                 return nullptr;
             }
 
-            // TODO: Implement proper types.
-            Owning_Ptr<Type_Name> return_type = nullptr;
-            if(std::string return_name; _lexer.match_identifier(return_name)) {
-                return_type = new Type_Name();
-            } else {
+            Owning_Ptr return_type = try_type_name();
+            if(!return_type) {
                 set_error("Expected return type.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
@@ -347,17 +344,14 @@ namespace tildac {
                 return nullptr;
             }
 
-            // TODO: Implement proper types.
-            Type_Name* type = nullptr;
-            if(std::string parameter_type; _lexer.match_identifier(parameter_type)) {
-                type = new Type_Name();
-            } else {
+            Owning_Ptr parameter_type = try_type_name();
+            if(!parameter_type) {
                 set_error("Expected parameter type.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
 
-            return new Function_Parameter(identifier.release(), type);
+            return new Function_Parameter(identifier.release(), parameter_type.release());
         }
 
         Function_Parameter_List* try_function_parameter_list() {
@@ -400,6 +394,16 @@ namespace tildac {
                 return new Function_Body;
             } else {
                 set_error("Expected function body.");
+                return nullptr;
+            }
+        }
+
+        Type_Name* try_type_name() {
+            std::string name;
+            if(_lexer.match_identifier(name)) {
+                return new Type_Name(std::move(name));
+            } else {
+                set_error("Expected identifier.");
                 return nullptr;
             }
         }

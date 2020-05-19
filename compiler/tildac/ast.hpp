@@ -48,9 +48,16 @@ namespace tildac {
 
     class Type_Name: public Syntax_Tree_Node {
     public:
+        Type_Name(std::string const& name): _name(name) {}
+        Type_Name(std::string&& name): _name(std::move(name)) {}
+
         virtual void print(std::ostream& stream, Indent const indent) const override {
             stream << indent << "Node: Type Name\n";
+            stream << Indent{indent.indent_count + 1} << "Type: " << _name << '\n';
         }
+    
+    private:
+        std::string _name;
     };
 
     class Declaration: public Syntax_Tree_Node {};
