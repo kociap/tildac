@@ -27,7 +27,7 @@ namespace tildac {
         Identifier(std::string&& string): _name(std::move(string)) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Identifier\n";
+            stream << indent << "Identifier:\n";
             stream << Indent{indent.indent_count + 1} << "Name: " << _name << "\n";
         }
 
@@ -42,7 +42,7 @@ namespace tildac {
         Identifier_Expression(Identifier* identifier): _identifier(identifier) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Identifier_Expression\n";
+            stream << indent << "Identifier_Expression:\n";
             _identifier->print(stream, Indent{indent.indent_count + 1});
         }
 
@@ -57,7 +57,7 @@ namespace tildac {
         Qualified_Type(std::string name): _name(name) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Qualified_Type\n";
+            stream << indent << "Qualified_Type:\n";
             stream << Indent{indent.indent_count + 1} << "Type: " << _name << '\n';
         }
 
@@ -74,9 +74,9 @@ namespace tildac {
         }
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Template_ID\n";
+            stream << indent << "Template_ID:\n";
             stream << Indent{indent.indent_count + 1} << "Type:\n";
-            _qualified_type->print(stream, Indent{indent.indent_count + 1});
+            _qualified_type->print(stream, Indent{indent.indent_count + 2});
             stream << Indent{indent.indent_count + 1} << "Nested Types:\n";
             for(auto& nested_type: _nested_types) {
                 nested_type->print(stream, Indent{indent.indent_count + 2});
@@ -116,7 +116,7 @@ namespace tildac {
         : _Type(type), _identifier(identifier), _initializer(initializer) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Variable Declaration\n";
+            stream << indent << "Variable Declaration:\n";
             _Type->print(stream, {indent.indent_count + 1});
             _identifier->print(stream, {indent.indent_count + 1});
             if(_initializer) {
@@ -150,19 +150,50 @@ namespace tildac {
 
     class Statement: public Syntax_Tree_Node {};
 
-    class If_Statement: public Statement {
+    class Block_Statement: public Statement {
     public:
-        If_Statement(Expression* condition, Statement_List* statements): _condition(condition), _statement_list(statements) {}
+        Block_Statement(Statement_List* statements): _statements(statements) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: If_Statement\n";
+            stream << indent << "Block_Statement:\n";
+            if(_statements) {
+                _statements->print(stream, Indent{indent.indent_count + 1});
+            }
+        }
+
+    private:
+        Owning_Ptr<Statement_List> _statements;
+    };
+
+    class If_Statement: public Statement {
+    public:
+        If_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "If_Statement:\n";
             _condition->print(stream, Indent{indent.indent_count + 1});
-            _statement_list->print(stream, Indent{indent.indent_count + 1});
+            _block->print(stream, Indent{indent.indent_count + 1});
         }
 
     private:
         Owning_Ptr<Expression> _condition;
-        Owning_Ptr<Statement_List> _statement_list;
+        Owning_Ptr<Block_Statement> _block;
+    };
+
+    class While_Statement: public Statement {
+    public:
+        While_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "While_Statement:\n";
+            _condition->print(stream, Indent{indent.indent_count + 1});
+            _block->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Expression> _condition;
+        Owning_Ptr<Block_Statement> _block;
+
     };
 
     class Declaration_Statement: public Statement {
@@ -170,7 +201,7 @@ namespace tildac {
         Declaration_Statement(Variable_Declaration* var_decl): _var_decl(var_decl) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Declaration_Statement (Variable Declaration)\n";
+            stream << indent << "Declaration_Statement (Variable Declaration):\n";
             _var_decl->print(stream, Indent{indent.indent_count + 1});
         }
 
@@ -183,7 +214,7 @@ namespace tildac {
         Expression_Statement(Expression* expression): _expr(expression) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Expression_Statement\n";
+            stream << indent << "Expression_Statement:\n";
             _expr->print(stream, Indent{indent.indent_count + 1});
         }
 
@@ -196,7 +227,7 @@ namespace tildac {
         Function_Parameter(Identifier* identifier, Type* type): _identifier(identifier), _type(type) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Function Parameter\n";
+            stream << indent << "Function Parameter:\n";
             _identifier->print(stream, {indent.indent_count + 1});
             _type->print(stream, {indent.indent_count + 1});
         }
@@ -209,7 +240,7 @@ namespace tildac {
     class Function_Parameter_List: public Syntax_Tree_Node {
     public:
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Function Parameter List\n";
+            stream << indent << "Function Parameter List:\n";
             for(Function_Parameter const* const param: _params) {
                 param->print(stream, {indent.indent_count + 1});
             }
@@ -232,7 +263,7 @@ namespace tildac {
         Function_Body(Statement_List* statement_list): _statements(statement_list) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Function Body\n";
+            stream << indent << "Function Body:\n";
             if(_statements) {
                 _statements->print(stream, Indent{indent.indent_count + 1});
             }
@@ -255,7 +286,7 @@ namespace tildac {
         }
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Node: Function Declaration\n";
+            stream << indent << "Function Declaration:\n";
             stream << Indent{indent.indent_count + 1} << "Name:\n";
             _name->print(stream, Indent{indent.indent_count + 2});
             stream << Indent{indent.indent_count + 1} << "Parameter List:\n";

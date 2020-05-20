@@ -465,8 +465,18 @@ namespace tildac {
         Statement_List* try_statement_list() {
             Statement_List* statements = new Statement_List;
             while(true) {
+                if(Block_Statement* block_statement = try_block_statement()) {
+                    statements->append(block_statement);
+                    continue;
+                }
+
                 if(If_Statement* if_statement = try_if_statement()) {
                     statements->append(if_statement);
+                    continue;
+                }
+
+                if(While_Statement* while_statement = try_while_statement()) {
+                    statements->append(while_statement);
                     continue;
                 }
 
@@ -541,22 +551,8 @@ namespace tildac {
             }
         }
 
-        If_Statement* try_if_statement() {
+        Block_Statement* try_block_statement() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            if(!_lexer.match(kw_if)) {
-                set_error("Expected `if`.");
-                _lexer.restore_state(state_backup);
-                return nullptr;
-            }
-
-            Owning_Ptr condition = try_expression();
-            if(!condition) {
-                _lexer.restore_state(state_backup);
-                return nullptr;
-            }
-
-            // TODO: Extract this into a block statement.
-
             if(!_lexer.match(token_brace_open)) {
                 set_error("Expected `{`.");
                 _lexer.restore_state(state_backup);
@@ -564,7 +560,7 @@ namespace tildac {
             }
 
             if(_lexer.match(token_brace_close)) {
-                return new If_Statement(condition.release(), new Statement_List);
+                return new Block_Statement(nullptr);
             }
 
             Owning_Ptr statements = try_statement_list();
@@ -579,7 +575,53 @@ namespace tildac {
                 return nullptr;
             }
 
-            return new If_Statement(condition.release(), statements.release());
+            return new Block_Statement(statements.release());
+        }
+
+        If_Statement* try_if_statement() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.match(kw_if)) {
+                set_error("Expected `if`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr condition = try_expression();
+            if(!condition) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr block = try_block_statement();
+            if(!block) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+            
+            return new If_Statement(condition.release(), block.release());
+        }
+
+        While_Statement* try_while_statement() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.match(kw_while)) {
+                set_error("Expected `while`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr condition = try_expression();
+            if(!condition) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr block = try_block_statement();
+            if(!block) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new While_Statement(condition.release(), block.release());
         }
 
         Expression_Statement* try_expression_statement() {
@@ -590,7 +632,7 @@ namespace tildac {
                 return nullptr;
             }
 
-            if(_lexer.match(token_semicolon)) {
+            if(!_lexer.match(token_semicolon)) {
                 set_error("Expected `;` at the end of statement.");
                 _lexer.restore_state(state_backup);
                 return nullptr;

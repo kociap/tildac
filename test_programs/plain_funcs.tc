@@ -4,6 +4,16 @@ fn mul(x: i32) -> void {
     if var2 {
         var var_inside_if: i32 = var2;
     }
+
+    {
+        if true {
+            true;
+        }
+    }
+
+    while var3 {
+        b;
+    }
 }
 
 fn main(argc : i64, argv:c8) -> i32 {
