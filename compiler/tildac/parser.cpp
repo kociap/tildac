@@ -684,15 +684,72 @@ namespace tildac {
         }
 
         Expression* try_expression() {
+            if(auto* boolean_or = try_boolean_or_expression()) {
+                return boolean_or;
+            }
+
             if(Bool_Literal* bool_literal = try_bool_literal()) {
                 return bool_literal;
             }
 
-            if(std::string name; _lexer.match_identifier(name)) {
-                Identifier* identifier = new Identifier(name);
-                return new Identifier_Expression(identifier);
+            if(Identifier_Expression* identifier_expression = try_identifier_expression()) {
+                return identifier_expression;
             }
             
+            return nullptr;
+        }
+
+        Expression* try_boolean_or_expression() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            Owning_Ptr lhs = try_boolean_and_expression();
+            if(!lhs) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_logic_or)) {
+                return lhs.release();
+            }
+
+            Owning_Ptr rhs = try_boolean_or_expression();
+            if(!rhs) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new Boolean_Or_Expression(lhs.release(), rhs.release());
+        }
+
+        Expression* try_boolean_and_expression() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            Owning_Ptr lhs = try_primary_expression();
+            if(!lhs) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_logic_and)) {
+                return lhs.release();
+            }
+
+            Owning_Ptr rhs = try_boolean_and_expression();
+            if(!rhs) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new Boolean_And_Expression(lhs.release(), rhs.release());
+        }
+
+        Expression* try_primary_expression() {
+            if(Bool_Literal* bool_literal = try_bool_literal()) {
+                return bool_literal;
+            }
+
+            if(Identifier_Expression* identifier_expression = try_identifier_expression()) {
+                return identifier_expression;
+            }
+
             return nullptr;
         }
 
@@ -703,6 +760,16 @@ namespace tildac {
                 return new Bool_Literal(false);
             } else {
                 set_error("Expected bool literal.");
+                return nullptr;
+            }
+        }
+
+        Identifier_Expression* try_identifier_expression() {
+            if(std::string name; _lexer.match_identifier(name)) {
+                Identifier* identifier = new Identifier(name);
+                return new Identifier_Expression(identifier);
+            } else {
+                set_error("Expected an identifer.");
                 return nullptr;
             }
         }

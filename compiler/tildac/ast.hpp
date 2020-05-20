@@ -88,6 +88,36 @@ namespace tildac {
         Owning_Ptr<Identifier> _identifier;
     };
 
+    class Boolean_Or_Expression: public Expression {
+    public:
+        Boolean_Or_Expression(Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Boolean_Or_Expression:\n";
+            _lhs->print(stream, Indent{indent.indent_count + 1});
+            _rhs->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Expression> _lhs;
+        Owning_Ptr<Expression> _rhs;
+    };
+
+    class Boolean_And_Expression: public Expression {
+    public:
+        Boolean_And_Expression(Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Boolean_And_Expression:\n";
+            _lhs->print(stream, Indent{indent.indent_count + 1});
+            _rhs->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Expression> _lhs;
+        Owning_Ptr<Expression> _rhs;
+    };
+
     class Bool_Literal: public Expression {
     public:
         Bool_Literal(bool value): _value(value) {}

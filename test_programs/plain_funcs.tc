@@ -2,11 +2,12 @@ fn mul(x: i32) -> void {
     var variable0: i32 = a;
     var variable1: T<U<u64>, V<i64>>= variable0;
     if var2 {
-        var var_inside_if: i32 = var2;
+        var var_inside_if: bool = true || variable0;
+        var var_inside_if: bool = true && variable0 || true;
     }
 
     {
-        if true {
+        if true || var2 || false && var_false && var_true || var_or {
             true;
         }
     }
