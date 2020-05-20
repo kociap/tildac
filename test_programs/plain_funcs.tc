@@ -11,6 +11,10 @@ fn mul(x: i32) -> void {
         }
     }
 
+    do {
+        var do_while_var: i32 = do_while;
+    } while true;
+
     while var3 {
         b;
     }

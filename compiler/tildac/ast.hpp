@@ -196,6 +196,22 @@ namespace tildac {
 
     };
 
+    class Do_While_Statement: public Statement {
+    public:
+        Do_While_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Do_While_Statement:\n";
+            _condition->print(stream, Indent{indent.indent_count + 1});
+            _block->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Expression> _condition;
+        Owning_Ptr<Block_Statement> _block;
+
+    };
+
     class Declaration_Statement: public Statement {
     public:
         Declaration_Statement(Variable_Declaration* var_decl): _var_decl(var_decl) {}

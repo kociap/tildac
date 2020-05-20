@@ -480,6 +480,11 @@ namespace tildac {
                     continue;
                 }
 
+                if(Do_While_Statement* do_while_statement = try_do_while_statement()) {
+                    statements->append(do_while_statement);
+                    continue;
+                }
+
                 if(Variable_Declaration* decl = try_variable_declaration()) {
                     Declaration_Statement* decl_stmt = new Declaration_Statement(decl);
                     statements->append(decl_stmt);
@@ -622,6 +627,41 @@ namespace tildac {
             }
 
             return new While_Statement(condition.release(), block.release());
+        }
+
+        Do_While_Statement* try_do_while_statement() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.match(kw_do)) {
+                set_error("Expected `do`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr block = try_block_statement();
+            if(!block) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(kw_while)) {
+                set_error("Expected `while`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr condition = try_expression();
+            if(!condition) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_semicolon)) {
+                set_error("Expected `;` after do-while statement.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+            
+            return new Do_While_Statement(condition.release(), block.release());
         }
 
         Expression_Statement* try_expression_statement() {
