@@ -35,21 +35,6 @@ namespace tildac {
         std::string _name;
     };
 
-    class Expression: public Syntax_Tree_Node {};
-
-    class Identifier_Expression: public Expression {
-    public:
-        Identifier_Expression(Identifier* identifier): _identifier(identifier) {}
-
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Identifier_Expression:\n";
-            _identifier->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Identifier> _identifier;
-    };
-
     class Type: public Syntax_Tree_Node {};
 
     class Qualified_Type: public Type {
@@ -86,6 +71,33 @@ namespace tildac {
     private:
         std::vector<Owning_Ptr<Type>> _nested_types;
         Owning_Ptr<Qualified_Type> _qualified_type;
+    };
+
+    class Expression: public Syntax_Tree_Node {};
+
+    class Identifier_Expression: public Expression {
+    public:
+        Identifier_Expression(Identifier* identifier): _identifier(identifier) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Identifier_Expression:\n";
+            _identifier->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Identifier> _identifier;
+    };
+
+    class Bool_Literal: public Expression {
+    public:
+        Bool_Literal(bool value): _value(value) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Bool_Literal: " << (_value ? "true" : "false") << "\n";
+        }
+
+    private:
+        bool _value;
     };
 
     class Declaration: public Syntax_Tree_Node {};

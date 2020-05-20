@@ -28,6 +28,8 @@ namespace tildac {
     static constexpr std::string_view kw_continue = "continue";
     static constexpr std::string_view kw_mut = "mut";
     static constexpr std::string_view kw_var = "var";
+    static constexpr std::string_view kw_true = "true";
+    static constexpr std::string_view kw_false = "false";
     // builtin types
     static constexpr std::string_view token_void = "void";
     static constexpr std::string_view token_bool = "bool";
@@ -682,10 +684,25 @@ namespace tildac {
         }
 
         Expression* try_expression() {
+            if(Bool_Literal* bool_literal = try_bool_literal()) {
+                return bool_literal;
+            }
+
             if(std::string name; _lexer.match_identifier(name)) {
                 Identifier* identifier = new Identifier(name);
                 return new Identifier_Expression(identifier);
+            }
+            
+            return nullptr;
+        }
+
+        Bool_Literal* try_bool_literal() {
+            if(_lexer.match(kw_true)) {
+                return new Bool_Literal(true);
+            } else if(_lexer.match(kw_false)) {
+                return new Bool_Literal(false);
             } else {
+                set_error("Expected bool literal.");
                 return nullptr;
             }
         }
