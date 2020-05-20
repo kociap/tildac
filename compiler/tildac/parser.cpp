@@ -456,7 +456,7 @@ namespace tildac {
 
             if(!_lexer.match(token_brace_close)) {
                 set_error("Expected `}` at the end of the function body.");
-                return nullptr;
+            return nullptr;
             }
 
             return new Function_Body(statements.release());
@@ -465,7 +465,12 @@ namespace tildac {
         Statement_List* try_statement_list() {
             Statement_List* statements = new Statement_List;
             while(true) {
-                if(Variable_Declaration* decl = try_variable_declaration(); decl) {
+                if(If_Statement* if_statement = try_if_statement()) {
+                    statements->append(if_statement);
+                    continue;
+                }
+
+                if(Variable_Declaration* decl = try_variable_declaration()) {
                     Declaration_Statement* decl_stmt = new Declaration_Statement(decl);
                     statements->append(decl_stmt);
                     continue;
@@ -531,9 +536,50 @@ namespace tildac {
             if(std::string name; _lexer.match_identifier(name)) {
                 return new Qualified_Type(name);
             } else {
-                set_error("Expected identifier");
+                set_error("Expected identifier.");
                 return nullptr;
             }
+        }
+
+        If_Statement* try_if_statement() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.match(kw_if)) {
+                set_error("Expected `if`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr condition = try_expression();
+            if(!condition) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            // TODO: Extract this into a block statement.
+
+            if(!_lexer.match(token_brace_open)) {
+                set_error("Expected `{`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(_lexer.match(token_brace_close)) {
+                return new If_Statement(condition.release(), new Statement_List);
+            }
+
+            Owning_Ptr statements = try_statement_list();
+            if(statements->size() == 0) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_brace_close)) {
+                set_error("Expected `}` at the end of the block.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new If_Statement(condition.release(), statements.release());
         }
 
         Expression_Statement* try_expression_statement() {
@@ -545,7 +591,7 @@ namespace tildac {
             }
 
             if(_lexer.match(token_semicolon)) {
-                set_error("Expected `;` at the end of statement");
+                set_error("Expected `;` at the end of statement.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }

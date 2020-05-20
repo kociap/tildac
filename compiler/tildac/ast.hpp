@@ -2,6 +2,7 @@
 #define TILDAC_AST_HPP_INCLUDE
 
 #include <tildac/types.hpp>
+#include <tildac/utility.hpp>
 
 #include <string>
 #include <vector>
@@ -12,12 +13,7 @@ namespace tildac {
         i64 indent_count = 0;
     };
 
-    std::ostream& operator<<(std::ostream& stream, Indent indent) {
-        for(i64 i = 0; i < indent.indent_count; ++i) {
-            stream << "  ";
-        }
-        return stream;
-    }
+    std::ostream& operator<<(std::ostream& stream, Indent indent);
 
     class Syntax_Tree_Node {
     public:
@@ -134,7 +130,40 @@ namespace tildac {
         Owning_Ptr<Expression> _initializer = nullptr;
     };
 
+    class Statement;
+
+    class Statement_List: public Syntax_Tree_Node {
+    public:
+        void append(Statement* const declaration) {
+            _statements.emplace_back(declaration);
+        }
+
+        [[nodiscard]] i64 size() const {
+            return _statements.size();
+        }
+
+        virtual void print(std::ostream& stream, Indent const indent) const override;
+
+    private:
+        std::vector<Owning_Ptr<Statement>> _statements;
+    };
+
     class Statement: public Syntax_Tree_Node {};
+
+    class If_Statement: public Statement {
+    public:
+        If_Statement(Expression* condition, Statement_List* statements): _condition(condition), _statement_list(statements) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Node: If_Statement\n";
+            _condition->print(stream, Indent{indent.indent_count + 1});
+            _statement_list->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Expression> _condition;
+        Owning_Ptr<Statement_List> _statement_list;
+    };
 
     class Declaration_Statement: public Statement {
     public:
@@ -160,26 +189,6 @@ namespace tildac {
 
     private:
         Owning_Ptr<Expression> _expr;
-    };
-
-    class Statement_List: public Syntax_Tree_Node {
-    public:
-        void append(Statement* const declaration) {
-            _statements.emplace_back(declaration);
-        }
-
-        [[nodiscard]] i64 size() const {
-            return _statements.size();
-        }
-
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            for(auto& statement: _statements) {
-                statement->print(stream, indent);
-            }
-        }
-
-    private:
-        std::vector<Owning_Ptr<Statement>> _statements;
     };
 
     class Function_Parameter: public Syntax_Tree_Node {
