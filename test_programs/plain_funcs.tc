@@ -10,6 +10,10 @@ fn mul(x: i32) -> void {
         if true || var2 || false && var_false && var_true || var_or {
             true;
         }
+
+        if variable0 || true && false {
+
+        }
     }
 
     do {

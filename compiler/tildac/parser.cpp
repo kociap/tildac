@@ -742,6 +742,23 @@ namespace tildac {
         }
 
         Expression* try_primary_expression() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(_lexer.match(token_paren_open)) {
+                Owning_Ptr paren_expression = try_expression();
+                if(!paren_expression) {
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
+
+                if(_lexer.match(token_paren_close)) {
+                    return paren_expression.release();
+                } else {
+                    set_error("Expected `)`.");
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
+            }
+
             if(Bool_Literal* bool_literal = try_bool_literal()) {
                 return bool_literal;
             }
