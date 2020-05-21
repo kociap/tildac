@@ -118,6 +118,22 @@ namespace tildac {
         Owning_Ptr<Expression> _rhs;
     };
 
+    class Add_Sub_Expression: public Expression {
+    public:
+        Add_Sub_Expression(bool is_add, Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs), _is_add(is_add) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Add_Sub_Expression (" << (_is_add ? "addition" : "subtraction") << "):\n";
+            _lhs->print(stream, Indent{indent.indent_count + 1});
+            _rhs->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Expression> _lhs;
+        Owning_Ptr<Expression> _rhs;
+        bool _is_add;
+    };
+
     class Argument_List: public Syntax_Tree_Node {
     public:
         void append(Expression* argument) {

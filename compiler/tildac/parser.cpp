@@ -561,7 +561,7 @@ namespace tildac {
         Block_Statement* try_block_statement() {
             Lexer_State const state_backup = _lexer.get_current_state();
             if(!_lexer.match(token_brace_open)) {
-                set_error("Expected `{`.");
+                set_error("Expected `{` at the start of the block.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
@@ -722,7 +722,7 @@ namespace tildac {
 
         Expression* try_boolean_and_expression() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            Owning_Ptr lhs = try_primary_expression();
+            Owning_Ptr lhs = try_add_sub_expression();
             if(!lhs) {
                 _lexer.restore_state(state_backup);
                 return nullptr;
@@ -739,6 +739,28 @@ namespace tildac {
             }
 
             return new Boolean_And_Expression(lhs.release(), rhs.release());
+        }
+
+        Expression* try_add_sub_expression() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            Owning_Ptr lhs = try_primary_expression();
+            if(!lhs) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            bool const is_add = _lexer.match(token_plus);
+            if(!is_add && !_lexer.match(token_minus)) {
+                return lhs.release();
+            }
+
+            Owning_Ptr rhs = try_add_sub_expression();
+            if(!rhs) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new Add_Sub_Expression(is_add, lhs.release(), rhs.release());
         }
 
         Expression* try_primary_expression() {
