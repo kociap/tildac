@@ -130,6 +130,18 @@ namespace tildac {
         bool _value;
     };
 
+    class Integer_Literal: public Expression {
+    public:
+        Integer_Literal(std::string value): _value(value) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Integer_Literal: " << _value << "\n";
+        }
+
+    private:
+        std::string _value;
+    };
+
     class Declaration: public Syntax_Tree_Node {};
 
     class Declaration_Sequence: public Syntax_Tree_Node {

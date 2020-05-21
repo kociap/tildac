@@ -206,11 +206,6 @@ namespace tildac {
             _column = state.column;
         }
 
-    private:
-        std::istream& _stream;
-        i64 _line = 0;
-        i64 _column = 0;
-
         char32 get_next() {
             char32 const c = _stream.get();
             if(c == '\n') {
@@ -229,6 +224,11 @@ namespace tildac {
         void unget() {
             _stream.unget();
         }
+
+    private:
+        std::istream& _stream;
+        i64 _line = 0;
+        i64 _column = 0;
     };
 
     class Parser {
@@ -759,6 +759,10 @@ namespace tildac {
                 }
             }
 
+            if(Integer_Literal* integer_literal = try_integer_literal()) {
+                return integer_literal;
+            }
+
             if(Bool_Literal* bool_literal = try_bool_literal()) {
                 return bool_literal;
             }
@@ -768,6 +772,36 @@ namespace tildac {
             }
 
             return nullptr;
+        }
+
+        Integer_Literal* try_integer_literal() {
+            _lexer.ignore_whitespace_and_comments();
+
+            Lexer_State const state_backup = _lexer.get_current_state();
+
+            std::string out;
+            char32 next = _lexer.peek_next();
+            if(next == '-' || next == '+') {
+                out += next;
+                _lexer.get_next();
+            }
+
+            // TODO: Add handling for leading zeros.
+            // TODO: Add hexadecimal and binary literals.
+
+            i64 length = 0;
+            while(is_digit(_lexer.peek_next())) {
+                out += _lexer.get_next();
+                length += 1;
+            }
+
+            if(length != 0) {
+                return new Integer_Literal(std::move(out));
+            } else {
+                set_error("Expected more than 0 digits.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
         }
 
         Bool_Literal* try_bool_literal() {
