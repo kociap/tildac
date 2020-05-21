@@ -7,8 +7,8 @@ fn mul(x: i32) -> void {
     }
 
     {
-        if 123 || var2 || false && var_false && var_true || var_or {
-            true;
+        if function() || function_single(var2) || function_single(false && var_false && (var_true || var_or)) {
+            function_multi(false, var0 && var1, nested_fn(1, true));
         }
 
         if variable0 || true && false {

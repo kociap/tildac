@@ -763,6 +763,10 @@ namespace tildac {
                 return integer_literal;
             }
 
+            if(Function_Call_Expression* function_call = try_function_call_expression()) {
+                return function_call;
+            }
+
             if(Bool_Literal* bool_literal = try_bool_literal()) {
                 return bool_literal;
             }
@@ -772,6 +776,46 @@ namespace tildac {
             }
 
             return nullptr;
+        }
+
+        Function_Call_Expression* try_function_call_expression() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            Owning_Ptr<Identifier> identifier = nullptr;
+            if(std::string name; _lexer.match_identifier(name)) {
+                identifier = new Identifier(std::move(name));
+            } else {
+                set_error("Expected function name.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_paren_open)) {
+                set_error("Expected `(`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+            
+            Owning_Ptr arg_list = new Argument_List;
+            if(_lexer.match(token_paren_close)) {
+                return new Function_Call_Expression(identifier.release(), arg_list.release());
+            }
+
+            do {
+                if(Expression* expression = try_expression()) {
+                    arg_list->append(expression);
+                } else {
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
+            } while(_lexer.match(token_comma));
+
+            if(!_lexer.match(token_paren_close)) {
+                set_error("Expected `)`.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new Function_Call_Expression(identifier.release(), arg_list.release());
         }
 
         Integer_Literal* try_integer_literal() {

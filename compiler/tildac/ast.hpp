@@ -118,6 +118,38 @@ namespace tildac {
         Owning_Ptr<Expression> _rhs;
     };
 
+    class Argument_List: public Syntax_Tree_Node {
+    public:
+        void append(Expression* argument) {
+            _arguments.emplace_back(argument);
+        }
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Argument_List:\n";
+            for(auto& argument: _arguments) {
+                argument->print(stream, Indent{indent.indent_count + 1});
+            }
+        }
+
+    private:
+        std::vector<Owning_Ptr<Expression>> _arguments;
+    };
+
+    class Function_Call_Expression: public Expression {
+    public:
+        Function_Call_Expression(Identifier* identifier, Argument_List* arg_list): _identifier(identifier), _arg_list(arg_list) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Function_Call_Expression:\n";
+            _identifier->print(stream, Indent{indent.indent_count + 1});
+            _arg_list->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Identifier> _identifier;
+        Owning_Ptr<Argument_List> _arg_list;
+    };
+
     class Bool_Literal: public Expression {
     public:
         Bool_Literal(bool value): _value(value) {}
