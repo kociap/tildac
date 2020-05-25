@@ -134,6 +134,22 @@ namespace tildac {
         bool _is_add;
     };
 
+    class Mul_Div_Expression: public Expression {
+    public:
+        Mul_Div_Expression(bool is_mul, Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs), _is_mul(is_mul) {}
+
+        virtual void print(std::ostream& stream, Indent const indent) const override {
+            stream << indent << "Mul_Div_Expression (" << (_is_mul ? "multiplication" : "division") << "):\n";
+            _lhs->print(stream, Indent{indent.indent_count + 1});
+            _rhs->print(stream, Indent{indent.indent_count + 1});
+        }
+
+    private:
+        Owning_Ptr<Expression> _lhs;
+        Owning_Ptr<Expression> _rhs;
+        bool _is_mul;
+    };
+
     class Argument_List: public Syntax_Tree_Node {
     public:
         void append(Expression* argument) {

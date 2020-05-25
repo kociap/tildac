@@ -7,6 +7,7 @@ fn mul(x: i32) -> void {
     }
 
     {
+        var j: i32 = 8477 * 12 / 8;
         if function() + 15 || function_single(var2) || function_single(false && var_false && (var_true || var_or)) {
             function_multi(var0 + -748830238, var0 - -748830238, nested_fn(1, true));
         }

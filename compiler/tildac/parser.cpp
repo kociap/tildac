@@ -182,14 +182,17 @@ namespace tildac {
                     if(next_next_char == U'/') {
                         get_next();
                         while(get_next() != U'\n') {}
+                        continue;
                     } else if(next_next_char == U'*') {
                         get_next();
                         for(char32 c1 = get_next(), c2 = peek_next(); c1 != U'*' || c2 != U'/'; c1 = get_next(), c2 = _stream.peek()) {}
                         get_next();
+                        continue;
                     } else {
+                        // Not a comment. End skipping.
                         unget();
+                        break;
                     }
-                    continue;
                 }
 
                 break;
@@ -743,7 +746,7 @@ namespace tildac {
 
         Expression* try_add_sub_expression() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            Owning_Ptr lhs = try_primary_expression();
+            Owning_Ptr lhs = try_mul_div_expression();
             if(!lhs) {
                 _lexer.restore_state(state_backup);
                 return nullptr;
@@ -761,6 +764,28 @@ namespace tildac {
             }
 
             return new Add_Sub_Expression(is_add, lhs.release(), rhs.release());
+        }
+
+        Expression* try_mul_div_expression() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            Owning_Ptr lhs = try_primary_expression();
+            if(!lhs) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            bool const is_multiply = _lexer.match(token_multiply);
+            if(!is_multiply && !_lexer.match(token_divide)) {
+                return lhs.release();
+            }
+
+            Owning_Ptr rhs = try_mul_div_expression();
+            if(!rhs) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new Mul_Div_Expression(is_multiply, lhs.release(), rhs.release());
         }
 
         Expression* try_primary_expression() {
@@ -812,7 +837,7 @@ namespace tildac {
             }
 
             if(!_lexer.match(token_paren_open)) {
-                set_error("Expected `(`.");
+                set_error("Expected `(` after function name.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
