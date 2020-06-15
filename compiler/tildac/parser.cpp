@@ -1,5 +1,6 @@
 #include <tildac/parser.hpp>
 
+#include <tildac/ast_printing.hpp>
 #include <tildac/utility.hpp>
 #include <tildac/types.hpp>
 #include <tildac/ast.hpp>
@@ -241,7 +242,7 @@ namespace tildac {
         bool build_ast() {
             while(!_lexer.match_eof()) {
                 if(Declaration* declaration = try_declaration(); declaration) {
-                    declaration->print(std::cout, Indent{0});
+                    print_ast(*declaration, 0);
                     delete declaration;
                 } else {
                     return false;
@@ -451,7 +452,7 @@ namespace tildac {
             }
 
             if(_lexer.match(token_brace_close)) {
-                return new Function_Body(nullptr);
+                return new Function_Body(new Statement_List());
             }
 
             Owning_Ptr statements = try_statement_list();
@@ -498,6 +499,11 @@ namespace tildac {
 
                 if(Expression_Statement* expr_stmt = try_expression_statement()) {
                     statements->append(expr_stmt);
+                    continue;
+                }
+
+                if(Return_Statement* return_stmt = try_return_statement()) {
+                    statements->append(return_stmt);
                     continue;
                 }
 
@@ -570,7 +576,7 @@ namespace tildac {
             }
 
             if(_lexer.match(token_brace_close)) {
-                return new Block_Statement(nullptr);
+                return new Block_Statement(new Statement_List());
             }
 
             Owning_Ptr statements = try_statement_list();
@@ -667,6 +673,28 @@ namespace tildac {
             }
             
             return new Do_While_Statement(condition.release(), block.release());
+        }
+
+        Return_Statement* try_return_statement() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.match(kw_return)) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr expression = try_primary_expression();
+            if(!expression) {
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_semicolon)) {
+                set_error("Expected `;` at the end of statement.");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new Return_Statement(expression.release());
         }
 
         Expression_Statement* try_expression_statement() {

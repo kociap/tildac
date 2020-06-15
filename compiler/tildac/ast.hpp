@@ -28,6 +28,7 @@ namespace tildac {
         if_statement,
         while_statement,
         do_while_statement,
+        return_statement,
         declaration_statement,
         expression_statement,
         function_parameter,
@@ -54,8 +55,7 @@ namespace tildac {
     struct Identifier: public AST_Node {
         std::string name;
 
-        Identifier(std::string const& string): AST_Node({}, AST_Node_Type::identifier), name(string) {}
-        Identifier(std::string&& string): AST_Node({}, AST_Node_Type::identifier), name(std::move(string)) {}
+        Identifier(std::string string): AST_Node({}, AST_Node_Type::identifier), name(std::move(string)) {}
     };
 
     struct Type: public AST_Node {
@@ -65,7 +65,7 @@ namespace tildac {
     struct Qualified_Type: public Type {
         std::string name;
 
-        Qualified_Type(std::string name): Type({}, AST_Node_Type::qualified_type), name(name) {}
+        Qualified_Type(std::string name): Type({}, AST_Node_Type::qualified_type), name(std::move(name)) {}
     };
 
     struct Template_ID: public Type {
@@ -97,334 +97,195 @@ namespace tildac {
     };
 
     struct Boolean_And_Expression: public Expression {
-    public:
-        Boolean_And_Expression(Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs) {}
+        Owning_Ptr<Expression> lhs;
+        Owning_Ptr<Expression> rhs;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Boolean_And_Expression:\n";
-            _lhs->print(stream, Indent{indent.indent_count + 1});
-            _rhs->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Expression> _lhs;
-        Owning_Ptr<Expression> _rhs;
+        Boolean_And_Expression(Expression* lhs, Expression* rhs): Expression({}, AST_Node_Type::boolean_and_expression), lhs(lhs), rhs(rhs) {}
     };
 
     struct Add_Sub_Expression: public Expression {
-    public:
-        Add_Sub_Expression(bool is_add, Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs), _is_add(is_add) {}
+        Owning_Ptr<Expression> lhs;
+        Owning_Ptr<Expression> rhs;
+        bool is_add;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Add_Sub_Expression (" << (_is_add ? "addition" : "subtraction") << "):\n";
-            _lhs->print(stream, Indent{indent.indent_count + 1});
-            _rhs->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Expression> _lhs;
-        Owning_Ptr<Expression> _rhs;
-        bool _is_add;
+        Add_Sub_Expression(bool is_add, Expression* lhs, Expression* rhs)
+            : Expression({}, AST_Node_Type::add_sub_expression), lhs(lhs), rhs(rhs), is_add(is_add) {}
     };
 
     struct Mul_Div_Expression: public Expression {
-    public:
-        Mul_Div_Expression(bool is_mul, Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs), _is_mul(is_mul) {}
+        Owning_Ptr<Expression> lhs;
+        Owning_Ptr<Expression> rhs;
+        bool is_mul;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Mul_Div_Expression (" << (_is_mul ? "multiplication" : "division") << "):\n";
-            _lhs->print(stream, Indent{indent.indent_count + 1});
-            _rhs->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Expression> _lhs;
-        Owning_Ptr<Expression> _rhs;
-        bool _is_mul;
+        Mul_Div_Expression(bool is_mul, Expression* lhs, Expression* rhs)
+            : Expression({}, AST_Node_Type::mul_div_expression), lhs(lhs), rhs(rhs), is_mul(is_mul) {}
     };
 
     struct Argument_List: public AST_Node {
-    public:
+        Argument_List() : AST_Node({}, AST_Node_Type::argument_list) {}
+
         void append(Expression* argument) {
-            _arguments.emplace_back(argument);
+            arguments.emplace_back(argument);
         }
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Argument_List:\n";
-            for(auto& argument: _arguments) {
-                argument->print(stream, Indent{indent.indent_count + 1});
-            }
-        }
-
-    private:
-        std::vector<Owning_Ptr<Expression>> _arguments;
+        std::vector<Owning_Ptr<Expression>> arguments;
     };
 
     struct Function_Call_Expression: public Expression {
-    public:
-        Function_Call_Expression(Identifier* identifier, Argument_List* arg_list): _identifier(identifier), _arg_list(arg_list) {}
+        Owning_Ptr<Identifier> identifier;
+        Owning_Ptr<Argument_List> arg_list;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Function_Call_Expression:\n";
-            _identifier->print(stream, Indent{indent.indent_count + 1});
-            _arg_list->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Identifier> _identifier;
-        Owning_Ptr<Argument_List> _arg_list;
+        Function_Call_Expression(Identifier* identifier, Argument_List* arg_list)
+            : Expression({}, AST_Node_Type::function_call_expression), identifier(identifier), arg_list(arg_list) {}
     };
 
     struct Bool_Literal: public Expression {
-    public:
-        Bool_Literal(bool value): _value(value) {}
+        bool value;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Bool_Literal: " << (_value ? "true" : "false") << "\n";
-        }
-
-    private:
-        bool _value;
+        Bool_Literal(bool value): Expression({}, AST_Node_Type::bool_literal), value(value) {}
     };
 
     struct Integer_Literal: public Expression {
-    public:
-        Integer_Literal(std::string value): _value(value) {}
+        std::string value;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Integer_Literal: " << _value << "\n";
-        }
-
-    private:
-        std::string _value;
+        Integer_Literal(std::string value): Expression({}, AST_Node_Type::integer_literal), value(value) {}
     };
 
-    struct Declaration: public AST_Node {};
+    struct Declaration: public AST_Node {
+        using AST_Node::AST_Node;
+    };
 
     struct Declaration_Sequence: public AST_Node {
-    public:
+        std::vector<Owning_Ptr<Declaration>> decls;
+
+        Declaration_Sequence(): AST_Node({}, AST_Node_Type::declaration_sequence) {}
+
         void append(Declaration* const declaration) {
-            _decls.emplace_back(declaration);
+            decls.emplace_back(declaration);
         }
 
         [[nodiscard]] i64 size() const {
-            return _decls.size();
+            return decls.size();
         }
-
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            for(auto& decl: _decls) {
-                decl->print(stream, indent);
-            }
-        }
-
-    private:
-        std::vector<Owning_Ptr<Declaration>> _decls;
     };
 
     struct Variable_Declaration: public Declaration {
-    public:
-        Variable_Declaration(Type* type, Identifier* identifier, Expression* initializer): _Type(type), _identifier(identifier), _initializer(initializer) {}
+        Owning_Ptr<Type> type = nullptr;
+        Owning_Ptr<Identifier> identifier = nullptr;
+        Owning_Ptr<Expression> initializer = nullptr;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Variable Declaration:\n";
-            _Type->print(stream, {indent.indent_count + 1});
-            _identifier->print(stream, {indent.indent_count + 1});
-            if(_initializer) {
-                _initializer->print(stream, {indent.indent_count + 1});
-            }
-        }
-
-    private:
-        Owning_Ptr<Type> _Type = nullptr;
-        Owning_Ptr<Identifier> _identifier = nullptr;
-        Owning_Ptr<Expression> _initializer = nullptr;
+        Variable_Declaration(Type* type, Identifier* identifier, Expression* initializer)
+            : Declaration({}, AST_Node_Type::variable_declaration), type(type), identifier(identifier), initializer(initializer) {}
     };
 
     struct Statement;
 
     struct Statement_List: public AST_Node {
-    public:
+        std::vector<Owning_Ptr<Statement>> statements;
+
+        Statement_List(): AST_Node({}, AST_Node_Type::statement_list) {}
+
         void append(Statement* const declaration) {
-            _statements.emplace_back(declaration);
+            statements.emplace_back(declaration);
         }
 
         [[nodiscard]] i64 size() const {
-            return _statements.size();
+            return statements.size();
         }
-
-        virtual void print(std::ostream& stream, Indent const indent) const override;
-
-    private:
-        std::vector<Owning_Ptr<Statement>> _statements;
     };
 
-    struct Statement: public AST_Node {};
+    struct Statement: public AST_Node {
+        using AST_Node::AST_Node;
+    };
 
     struct Block_Statement: public Statement {
-    public:
-        Block_Statement(Statement_List* statements): _statements(statements) {}
+        Owning_Ptr<Statement_List> statements;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Block_Statement:\n";
-            if(_statements) {
-                _statements->print(stream, Indent{indent.indent_count + 1});
-            }
-        }
-
-    private:
-        Owning_Ptr<Statement_List> _statements;
+        Block_Statement(Statement_List* statements): Statement({}, AST_Node_Type::block_statement), statements(statements) {}
     };
 
     struct If_Statement: public Statement {
-    public:
-        If_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
+        Owning_Ptr<Expression> condition;
+        Owning_Ptr<Block_Statement> block;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "If_Statement:\n";
-            _condition->print(stream, Indent{indent.indent_count + 1});
-            _block->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Expression> _condition;
-        Owning_Ptr<Block_Statement> _block;
+        If_Statement(Expression* condition, Block_Statement* block): Statement({}, AST_Node_Type::if_statement), condition(condition), block(block) {}
     };
 
     struct While_Statement: public Statement {
-    public:
-        While_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
+        Owning_Ptr<Expression> condition;
+        Owning_Ptr<Block_Statement> block;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "While_Statement:\n";
-            _condition->print(stream, Indent{indent.indent_count + 1});
-            _block->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Expression> _condition;
-        Owning_Ptr<Block_Statement> _block;
+        While_Statement(Expression* condition, Block_Statement* block): Statement({}, AST_Node_Type::while_statement), condition(condition), block(block) {}
     };
 
     struct Do_While_Statement: public Statement {
-    public:
-        Do_While_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
+        Owning_Ptr<Expression> condition;
+        Owning_Ptr<Block_Statement> block;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Do_While_Statement:\n";
-            _condition->print(stream, Indent{indent.indent_count + 1});
-            _block->print(stream, Indent{indent.indent_count + 1});
-        }
+        Do_While_Statement(Expression* condition, Block_Statement* block)
+            : Statement({}, AST_Node_Type::do_while_statement), condition(condition), block(block) {}
+    };
 
-    private:
-        Owning_Ptr<Expression> _condition;
-        Owning_Ptr<Block_Statement> _block;
+    struct Return_Statement: public Statement {
+        Owning_Ptr<Expression> expression;
+
+        Return_Statement(Expression* expression)
+            : Statement({}, AST_Node_Type::return_statement), expression(expression) {}
     };
 
     struct Declaration_Statement: public Statement {
-    public:
-        Declaration_Statement(Variable_Declaration* var_decl): _var_decl(var_decl) {}
+        Owning_Ptr<Variable_Declaration> var_decl;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Declaration_Statement (Variable Declaration):\n";
-            _var_decl->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Variable_Declaration> _var_decl;
+        Declaration_Statement(Variable_Declaration* var_decl): Statement({}, AST_Node_Type::declaration_statement), var_decl(var_decl) {}
     };
 
     struct Expression_Statement: public Statement {
-    public:
-        Expression_Statement(Expression* expression): _expr(expression) {}
+        Owning_Ptr<Expression> expr;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Expression_Statement:\n";
-            _expr->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Expression> _expr;
+        Expression_Statement(Expression* expression): Statement({}, AST_Node_Type::expression_statement), expr(expression) {}
     };
 
     struct Function_Parameter: public AST_Node {
-    public:
-        Function_Parameter(Identifier* identifier, Type* type): _identifier(identifier), _type(type) {}
+        Identifier* identifier;
+        Type* type;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Function Parameter:\n";
-            _identifier->print(stream, {indent.indent_count + 1});
-            _type->print(stream, {indent.indent_count + 1});
-        }
-
-    private:
-        Identifier* _identifier;
-        Type* _type;
+        Function_Parameter(Identifier* identifier, Type* type): AST_Node({}, AST_Node_Type::declaration_statement), identifier(identifier), type(type) {}
     };
 
     struct Function_Parameter_List: public AST_Node {
-    public:
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Function Parameter List:\n";
-            for(Function_Parameter const* const param: _params) {
-                param->print(stream, {indent.indent_count + 1});
-            }
-        }
+        std::vector<Function_Parameter*> params;
+
+        Function_Parameter_List(): AST_Node({}, AST_Node_Type::function_parameter_list) {}
 
         void append_parameter(Function_Parameter* parameter) {
-            _params.push_back(parameter);
+            params.push_back(parameter);
         }
 
         i64 get_parameter_count() const {
-            return _params.size();
+            return params.size();
         }
-
-    private:
-        std::vector<Function_Parameter*> _params;
     };
 
     struct Function_Body: public AST_Node {
-    public:
-        Function_Body(Statement_List* statement_list): _statements(statement_list) {}
+        Owning_Ptr<Statement_List> statements;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Function Body:\n";
-            if(_statements) {
-                _statements->print(stream, Indent{indent.indent_count + 1});
-            }
-        }
-
-    private:
-        Owning_Ptr<Statement_List> _statements;
+        Function_Body(Statement_List* statement_list): AST_Node({}, AST_Node_Type::function_body), statements(statement_list) {}
     };
 
     struct Function_Declaration: public Declaration {
-    public:
+        Identifier* name;
+        Function_Parameter_List* parameter_list;
+        Type* return_type;
+        Function_Body* body;
+
         Function_Declaration(Identifier* name, Function_Parameter_List* function_parameter_list, Type* return_type, Function_Body* body)
-            : _name(name), _parameter_list(function_parameter_list), _return_type(return_type), _body(body) {}
+            : Declaration({}, AST_Node_Type::function_declaration), name(name), parameter_list(function_parameter_list), return_type(return_type), body(body) {}
 
         virtual ~Function_Declaration() override {
-            delete _name;
-            delete _return_type;
-            delete _body;
-            delete _parameter_list;
+            delete name;
+            delete return_type;
+            delete body;
+            delete parameter_list;
         }
-
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Function Declaration:\n";
-            stream << Indent{indent.indent_count + 1} << "Name:\n";
-            _name->print(stream, Indent{indent.indent_count + 2});
-            stream << Indent{indent.indent_count + 1} << "Parameter List:\n";
-            _parameter_list->print(stream, {indent.indent_count + 2});
-            stream << Indent{indent.indent_count + 1} << "Return_Type:\n";
-            _return_type->print(stream, Indent{indent.indent_count + 2});
-            stream << Indent{indent.indent_count + 1} << "Body:\n";
-            _body->print(stream, Indent{indent.indent_count + 2});
-        }
-
-    private:
-        Identifier* _name;
-        Function_Parameter_List* _parameter_list;
-        Type* _return_type;
-        Function_Body* _body;
     };
 } // namespace tildac
