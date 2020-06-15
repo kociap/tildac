@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tildac/types.hpp>
+
 namespace tildac {
     struct AST_Node;
 
