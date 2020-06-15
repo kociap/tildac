@@ -1,109 +1,102 @@
-#ifndef TILDAC_AST_HPP_INCLUDE
-#define TILDAC_AST_HPP_INCLUDE
+#pragma once
 
 #include <tildac/types.hpp>
 #include <tildac/utility.hpp>
 
+#include <ostream>
 #include <string>
 #include <vector>
-#include <ostream>
 
 namespace tildac {
-    struct Indent {
-        i64 indent_count = 0;
+    enum struct AST_Node_Type {
+        identifier,
+        qualified_type,
+        template_id,
+        identifier_expression,
+        boolean_or_expression,
+        boolean_and_expression,
+        add_sub_expression,
+        mul_div_expression,
+        argument_list,
+        function_call_expression,
+        bool_literal,
+        integer_literal,
+        declaration_sequence,
+        variable_declaration,
+        statement_list,
+        block_statement,
+        if_statement,
+        while_statement,
+        do_while_statement,
+        declaration_statement,
+        expression_statement,
+        function_parameter,
+        function_parameter_list,
+        function_body,
+        function_declaration,
     };
 
-    std::ostream& operator<<(std::ostream& stream, Indent indent);
-
-    class Syntax_Tree_Node {
-    public:
-        virtual ~Syntax_Tree_Node() = default;
-        virtual void print(std::ostream& stream, Indent indent) const = 0;
+    struct Source_Info {
+        char const* file;
+        i64 file_offset;
+        i64 line;
+        i64 column;
     };
 
-    class Identifier: public Syntax_Tree_Node {
-    public:
-        Identifier(std::string const& string): _name(string) {}
-        Identifier(std::string&& string): _name(std::move(string)) {}
+    struct AST_Node {
+        Source_Info source_info;
+        AST_Node_Type node_type;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Identifier:\n";
-            stream << Indent{indent.indent_count + 1} << "Name: " << _name << "\n";
-        }
-
-    private:
-        std::string _name;
+        AST_Node(Source_Info source_info, AST_Node_Type type): source_info(source_info), node_type(type) {}
+        virtual ~AST_Node() = default;
     };
 
-    class Type: public Syntax_Tree_Node {};
+    struct Identifier: public AST_Node {
+        std::string name;
 
-    class Qualified_Type: public Type {
-    public:
-        Qualified_Type(std::string name): _name(name) {}
-
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Qualified_Type:\n";
-            stream << Indent{indent.indent_count + 1} << "Type: " << _name << '\n';
-        }
-
-    private:
-        std::string _name;
+        Identifier(std::string const& string): AST_Node({}, AST_Node_Type::identifier), name(string) {}
+        Identifier(std::string&& string): AST_Node({}, AST_Node_Type::identifier), name(std::move(string)) {}
     };
 
-    class Template_ID: public Type {
-    public:
-        Template_ID(Qualified_Type* qualified_type): _qualified_type(qualified_type) {}
+    struct Type: public AST_Node {
+        using AST_Node::AST_Node;
+    };
+
+    struct Qualified_Type: public Type {
+        std::string name;
+
+        Qualified_Type(std::string name): Type({}, AST_Node_Type::qualified_type), name(name) {}
+    };
+
+    struct Template_ID: public Type {
+        std::vector<Owning_Ptr<Type>> nested_types;
+        Owning_Ptr<Qualified_Type> qualified_type;
+
+        Template_ID(Qualified_Type* qualified_type): Type({}, AST_Node_Type::template_id), qualified_type(qualified_type) {}
 
         void append(Type* nested_type) {
-            _nested_types.emplace_back(nested_type);
+            nested_types.emplace_back(nested_type);
         }
-
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Template_ID:\n";
-            stream << Indent{indent.indent_count + 1} << "Type:\n";
-            _qualified_type->print(stream, Indent{indent.indent_count + 2});
-            stream << Indent{indent.indent_count + 1} << "Nested Types:\n";
-            for(auto& nested_type: _nested_types) {
-                nested_type->print(stream, Indent{indent.indent_count + 2});
-            }
-        }
-
-    private:
-        std::vector<Owning_Ptr<Type>> _nested_types;
-        Owning_Ptr<Qualified_Type> _qualified_type;
     };
 
-    class Expression: public Syntax_Tree_Node {};
-
-    class Identifier_Expression: public Expression {
-    public:
-        Identifier_Expression(Identifier* identifier): _identifier(identifier) {}
-
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Identifier_Expression:\n";
-            _identifier->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Identifier> _identifier;
+    struct Expression: public AST_Node {
+        using AST_Node::AST_Node;
     };
 
-    class Boolean_Or_Expression: public Expression {
-    public:
-        Boolean_Or_Expression(Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs) {}
+    struct Identifier_Expression: public Expression {
+        Owning_Ptr<Identifier> identifier;
 
-        virtual void print(std::ostream& stream, Indent const indent) const override {
-            stream << indent << "Boolean_Or_Expression:\n";
-            _lhs->print(stream, Indent{indent.indent_count + 1});
-            _rhs->print(stream, Indent{indent.indent_count + 1});
-        }
-
-    private:
-        Owning_Ptr<Expression> _lhs;
-        Owning_Ptr<Expression> _rhs;
+        Identifier_Expression(Identifier* identifier): Expression({}, AST_Node_Type::identifier_expression), identifier(identifier) {}
     };
 
-    class Boolean_And_Expression: public Expression {
+    struct Boolean_Or_Expression: public Expression {
+        Owning_Ptr<Expression> lhs;
+        Owning_Ptr<Expression> rhs;
+
+        Boolean_Or_Expression(Expression* lhs, Expression* rhs): Expression({}, AST_Node_Type::boolean_or_expression), lhs(lhs), rhs(rhs) {}
+    };
+
+    struct Boolean_And_Expression: public Expression {
     public:
         Boolean_And_Expression(Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs) {}
 
@@ -118,7 +111,7 @@ namespace tildac {
         Owning_Ptr<Expression> _rhs;
     };
 
-    class Add_Sub_Expression: public Expression {
+    struct Add_Sub_Expression: public Expression {
     public:
         Add_Sub_Expression(bool is_add, Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs), _is_add(is_add) {}
 
@@ -134,7 +127,7 @@ namespace tildac {
         bool _is_add;
     };
 
-    class Mul_Div_Expression: public Expression {
+    struct Mul_Div_Expression: public Expression {
     public:
         Mul_Div_Expression(bool is_mul, Expression* lhs, Expression* rhs): _lhs(lhs), _rhs(rhs), _is_mul(is_mul) {}
 
@@ -150,7 +143,7 @@ namespace tildac {
         bool _is_mul;
     };
 
-    class Argument_List: public Syntax_Tree_Node {
+    struct Argument_List: public AST_Node {
     public:
         void append(Expression* argument) {
             _arguments.emplace_back(argument);
@@ -167,7 +160,7 @@ namespace tildac {
         std::vector<Owning_Ptr<Expression>> _arguments;
     };
 
-    class Function_Call_Expression: public Expression {
+    struct Function_Call_Expression: public Expression {
     public:
         Function_Call_Expression(Identifier* identifier, Argument_List* arg_list): _identifier(identifier), _arg_list(arg_list) {}
 
@@ -182,7 +175,7 @@ namespace tildac {
         Owning_Ptr<Argument_List> _arg_list;
     };
 
-    class Bool_Literal: public Expression {
+    struct Bool_Literal: public Expression {
     public:
         Bool_Literal(bool value): _value(value) {}
 
@@ -194,7 +187,7 @@ namespace tildac {
         bool _value;
     };
 
-    class Integer_Literal: public Expression {
+    struct Integer_Literal: public Expression {
     public:
         Integer_Literal(std::string value): _value(value) {}
 
@@ -206,9 +199,9 @@ namespace tildac {
         std::string _value;
     };
 
-    class Declaration: public Syntax_Tree_Node {};
+    struct Declaration: public AST_Node {};
 
-    class Declaration_Sequence: public Syntax_Tree_Node {
+    struct Declaration_Sequence: public AST_Node {
     public:
         void append(Declaration* const declaration) {
             _decls.emplace_back(declaration);
@@ -228,10 +221,9 @@ namespace tildac {
         std::vector<Owning_Ptr<Declaration>> _decls;
     };
 
-    class Variable_Declaration: public Declaration {
+    struct Variable_Declaration: public Declaration {
     public:
-        Variable_Declaration(Type* type, Identifier* identifier, Expression* initializer)
-        : _Type(type), _identifier(identifier), _initializer(initializer) {}
+        Variable_Declaration(Type* type, Identifier* identifier, Expression* initializer): _Type(type), _identifier(identifier), _initializer(initializer) {}
 
         virtual void print(std::ostream& stream, Indent const indent) const override {
             stream << indent << "Variable Declaration:\n";
@@ -248,9 +240,9 @@ namespace tildac {
         Owning_Ptr<Expression> _initializer = nullptr;
     };
 
-    class Statement;
+    struct Statement;
 
-    class Statement_List: public Syntax_Tree_Node {
+    struct Statement_List: public AST_Node {
     public:
         void append(Statement* const declaration) {
             _statements.emplace_back(declaration);
@@ -266,9 +258,9 @@ namespace tildac {
         std::vector<Owning_Ptr<Statement>> _statements;
     };
 
-    class Statement: public Syntax_Tree_Node {};
+    struct Statement: public AST_Node {};
 
-    class Block_Statement: public Statement {
+    struct Block_Statement: public Statement {
     public:
         Block_Statement(Statement_List* statements): _statements(statements) {}
 
@@ -283,7 +275,7 @@ namespace tildac {
         Owning_Ptr<Statement_List> _statements;
     };
 
-    class If_Statement: public Statement {
+    struct If_Statement: public Statement {
     public:
         If_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
 
@@ -298,7 +290,7 @@ namespace tildac {
         Owning_Ptr<Block_Statement> _block;
     };
 
-    class While_Statement: public Statement {
+    struct While_Statement: public Statement {
     public:
         While_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
 
@@ -311,10 +303,9 @@ namespace tildac {
     private:
         Owning_Ptr<Expression> _condition;
         Owning_Ptr<Block_Statement> _block;
-
     };
 
-    class Do_While_Statement: public Statement {
+    struct Do_While_Statement: public Statement {
     public:
         Do_While_Statement(Expression* condition, Block_Statement* block): _condition(condition), _block(block) {}
 
@@ -327,10 +318,9 @@ namespace tildac {
     private:
         Owning_Ptr<Expression> _condition;
         Owning_Ptr<Block_Statement> _block;
-
     };
 
-    class Declaration_Statement: public Statement {
+    struct Declaration_Statement: public Statement {
     public:
         Declaration_Statement(Variable_Declaration* var_decl): _var_decl(var_decl) {}
 
@@ -343,7 +333,7 @@ namespace tildac {
         Owning_Ptr<Variable_Declaration> _var_decl;
     };
 
-    class Expression_Statement: public Statement {
+    struct Expression_Statement: public Statement {
     public:
         Expression_Statement(Expression* expression): _expr(expression) {}
 
@@ -356,7 +346,7 @@ namespace tildac {
         Owning_Ptr<Expression> _expr;
     };
 
-    class Function_Parameter: public Syntax_Tree_Node {
+    struct Function_Parameter: public AST_Node {
     public:
         Function_Parameter(Identifier* identifier, Type* type): _identifier(identifier), _type(type) {}
 
@@ -371,7 +361,7 @@ namespace tildac {
         Type* _type;
     };
 
-    class Function_Parameter_List: public Syntax_Tree_Node {
+    struct Function_Parameter_List: public AST_Node {
     public:
         virtual void print(std::ostream& stream, Indent const indent) const override {
             stream << indent << "Function Parameter List:\n";
@@ -392,7 +382,7 @@ namespace tildac {
         std::vector<Function_Parameter*> _params;
     };
 
-    class Function_Body: public Syntax_Tree_Node {
+    struct Function_Body: public AST_Node {
     public:
         Function_Body(Statement_List* statement_list): _statements(statement_list) {}
 
@@ -407,10 +397,10 @@ namespace tildac {
         Owning_Ptr<Statement_List> _statements;
     };
 
-    class Function_Declaration: public Declaration {
+    struct Function_Declaration: public Declaration {
     public:
-        Function_Declaration(Identifier* name, Function_Parameter_List* function_parameter_list, Type* return_type, Function_Body* body): 
-            _name(name), _parameter_list(function_parameter_list), _return_type(return_type), _body(body) {}
+        Function_Declaration(Identifier* name, Function_Parameter_List* function_parameter_list, Type* return_type, Function_Body* body)
+            : _name(name), _parameter_list(function_parameter_list), _return_type(return_type), _body(body) {}
 
         virtual ~Function_Declaration() override {
             delete _name;
@@ -438,5 +428,3 @@ namespace tildac {
         Function_Body* _body;
     };
 } // namespace tildac
-
-#endif // !TILDAC_AST_HPP_INCLUDE
