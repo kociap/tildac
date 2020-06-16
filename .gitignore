@@ -3,5 +3,6 @@ build/
 
 build.sh
 build.bat
+buildf.bat
 run.bat
 run.sh

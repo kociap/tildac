@@ -122,7 +122,7 @@ namespace tildac {
     };
 
     struct Argument_List: public AST_Node {
-        Argument_List() : AST_Node({}, AST_Node_Type::argument_list) {}
+        Argument_List(): AST_Node({}, AST_Node_Type::argument_list) {}
 
         void append(Expression* argument) {
             arguments.emplace_back(argument);
@@ -229,8 +229,7 @@ namespace tildac {
     struct Return_Statement: public Statement {
         Owning_Ptr<Expression> expression;
 
-        Return_Statement(Expression* expression)
-            : Statement({}, AST_Node_Type::return_statement), expression(expression) {}
+        Return_Statement(Expression* expression): Statement({}, AST_Node_Type::return_statement), expression(expression) {}
     };
 
     struct Declaration_Statement: public Statement {
@@ -246,14 +245,14 @@ namespace tildac {
     };
 
     struct Function_Parameter: public AST_Node {
-        Identifier* identifier;
-        Type* type;
+        Owning_Ptr<Identifier> identifier;
+        Owning_Ptr<Type> type;
 
         Function_Parameter(Identifier* identifier, Type* type): AST_Node({}, AST_Node_Type::declaration_statement), identifier(identifier), type(type) {}
     };
 
     struct Function_Parameter_List: public AST_Node {
-        std::vector<Function_Parameter*> params;
+        std::vector<Owning_Ptr<Function_Parameter>> params;
 
         Function_Parameter_List(): AST_Node({}, AST_Node_Type::function_parameter_list) {}
 
@@ -273,19 +272,12 @@ namespace tildac {
     };
 
     struct Function_Declaration: public Declaration {
-        Identifier* name;
-        Function_Parameter_List* parameter_list;
-        Type* return_type;
-        Function_Body* body;
+        Owning_Ptr<Identifier> name;
+        Owning_Ptr<Function_Parameter_List> parameter_list;
+        Owning_Ptr<Type> return_type;
+        Owning_Ptr<Function_Body> body;
 
         Function_Declaration(Identifier* name, Function_Parameter_List* function_parameter_list, Type* return_type, Function_Body* body)
             : Declaration({}, AST_Node_Type::function_declaration), name(name), parameter_list(function_parameter_list), return_type(return_type), body(body) {}
-
-        virtual ~Function_Declaration() override {
-            delete name;
-            delete return_type;
-            delete body;
-            delete parameter_list;
-        }
     };
 } // namespace tildac

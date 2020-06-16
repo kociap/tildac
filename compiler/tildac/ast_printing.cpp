@@ -75,7 +75,7 @@ namespace tildac {
 
             case AST_Node_Type::add_sub_expression: {
                 auto const& node = static_cast<Add_Sub_Expression const&>(ast_node);
-                std::cout << Indent{indent_level} << "Add_Sub_Expression:\n (" <<  (node.is_add ? "addition" : "subtraction") << ")";
+                std::cout << Indent{indent_level} << "Add_Sub_Expression (" << (node.is_add ? "addition" : "subtraction") << "):\n";
                 print_ast(*node.lhs, indent_level + 1);
                 print_ast(*node.rhs, indent_level + 1);
                 return;
@@ -83,7 +83,7 @@ namespace tildac {
 
             case AST_Node_Type::mul_div_expression: {
                 auto const& node = static_cast<Mul_Div_Expression const&>(ast_node);
-                std::cout << Indent{indent_level} << "Mul_Div_Expression:\n (" <<  (node.is_mul ? "multiplication" : "division") << ")";
+                std::cout << Indent{indent_level} << "Mul_Div_Expression (" << (node.is_mul ? "multiplication" : "division") << "):\n";
                 print_ast(*node.lhs, indent_level + 1);
                 print_ast(*node.rhs, indent_level + 1);
                 return;

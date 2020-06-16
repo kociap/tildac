@@ -1,19 +1,18 @@
 #include <tildac/parser.hpp>
 
-#include <tildac/ast_printing.hpp>
-#include <tildac/utility.hpp>
-#include <tildac/types.hpp>
 #include <tildac/ast.hpp>
+#include <tildac/ast_printing.hpp>
+#include <tildac/types.hpp>
+#include <tildac/utility.hpp>
 
-#include <vector>
-#include <iostream>
-#include <string_view>
-#include <string>
 #include <fstream>
+#include <iostream>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace tildac {
     // TODO: call operator, array access operator, elvis operator
-
 
     // keywords
     static constexpr std::string_view kw_fn = "fn";
@@ -277,7 +276,7 @@ namespace tildac {
                 _last_error.file_offset = state.stream_offset;
             }
         }
-        
+
         Declaration* try_declaration() {
             if(Variable_Declaration* variable_declaration = try_variable_declaration(); variable_declaration) {
                 return variable_declaration;
@@ -385,7 +384,7 @@ namespace tildac {
 
         Function_Parameter* try_function_parameter() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            
+
             Owning_Ptr<Identifier> identifier = nullptr;
             if(std::string identifier_str; _lexer.match_identifier(identifier_str)) {
                 identifier = new Identifier(std::move(identifier_str));
@@ -421,7 +420,7 @@ namespace tildac {
             if(_lexer.match(token_paren_close)) {
                 return new Function_Parameter_List;
             }
-            
+
             // Match parameters.
             Owning_Ptr param_list = new Function_Parameter_List;
             {
@@ -462,7 +461,7 @@ namespace tildac {
 
             if(!_lexer.match(token_brace_close)) {
                 set_error("Expected `}` at the end of the function body.");
-            return nullptr;
+                return nullptr;
             }
 
             return new Function_Body(statements.release());
@@ -613,7 +612,7 @@ namespace tildac {
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
-            
+
             return new If_Statement(condition.release(), block.release());
         }
 
@@ -671,7 +670,7 @@ namespace tildac {
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
-            
+
             return new Do_While_Statement(condition.release(), block.release());
         }
 
@@ -682,7 +681,7 @@ namespace tildac {
                 return nullptr;
             }
 
-            Owning_Ptr expression = try_primary_expression();
+            Owning_Ptr expression = try_expression();
             if(!expression) {
                 _lexer.restore_state(state_backup);
                 return nullptr;
@@ -726,7 +725,7 @@ namespace tildac {
             if(Identifier_Expression* identifier_expression = try_identifier_expression()) {
                 return identifier_expression;
             }
-            
+
             return nullptr;
         }
 
@@ -869,7 +868,7 @@ namespace tildac {
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
-            
+
             Owning_Ptr arg_list = new Argument_List;
             if(_lexer.match(token_paren_close)) {
                 return new Function_Call_Expression(identifier.release(), arg_list.release());
@@ -953,11 +952,11 @@ namespace tildac {
             std::cout << "Could not open " << path << "\n";
             return;
         }
-        
+
         Parser parser(file);
         if(!parser.build_ast()) {
             Parse_Error error = parser.get_last_error();
             std::cout << path << " (" << error.line << ":" << error.column << ") error: " << error.message << '\n';
         }
     }
-}
+} // namespace tildac

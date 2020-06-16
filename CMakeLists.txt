@@ -15,3 +15,4 @@ add_executable(crust
 set_target_properties(crust PROPERTIES CXX_STANDARD 17 CXX_EXTENSIONS OFF)
 target_include_directories(crust PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/compiler")
 target_compile_definitions(crust PRIVATE _CRT_SECURE_NO_WARNINGS)
+target_compile_options(crust PRIVATE -Wall -Wextra -pedantic -Werror=return-type -Wnon-virtual-dtor)
