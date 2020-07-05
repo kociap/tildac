@@ -49,10 +49,39 @@ namespace tildac {
                 return;
             }
 
-            case AST_Node_Type::boolean_or_expression: {
-                auto const& node = static_cast<Boolean_Or_Expression const&>(ast_node);
-                std::cout << Indent{indent_level} << "Boolean_Or_Expression:\n";
+            case AST_Node_Type::binary_expression: {
+                auto const& node = static_cast<Binary_Expression const&>(ast_node);
+                std::cout << Indent{indent_level} << "Binary_Expression:\n";
                 print_ast(*node.lhs, indent_level + 1);
+                switch(node.op) {
+                    case Operator::binary_or: {
+                        std::cout << Indent{indent_level + 1} << "Operator: '||'\n";
+                    } break;
+
+                    case Operator::binary_and: {
+                        std::cout << Indent{indent_level + 1} << "Operator: '&&'\n";
+                    } break;
+
+                    case Operator::binary_eq: {
+                        std::cout << Indent{indent_level + 1} << "Operator: '=='\n";
+                    } break;
+
+                    case Operator::binary_add: {
+                        std::cout << Indent{indent_level + 1} << "Operator: '+'\n";
+                    } break;
+
+                    case Operator::binary_sub: {
+                        std::cout << Indent{indent_level + 1} << "Operator: '-'\n";
+                    } break;
+
+                    case Operator::binary_mul: {
+                        std::cout << Indent{indent_level + 1} << "Operator: '*'\n";
+                    } break;
+
+                    case Operator::binary_div: {
+                        std::cout << Indent{indent_level + 1} << "Operator: '/'\n";
+                    } break;
+                }
                 print_ast(*node.rhs, indent_level + 1);
                 return;
             }
@@ -62,30 +91,6 @@ namespace tildac {
                 for(auto& statement: node.statements) {
                     print_ast(*statement, indent_level);
                 }
-                return;
-            }
-
-            case AST_Node_Type::boolean_and_expression: {
-                auto const& node = static_cast<Boolean_And_Expression const&>(ast_node);
-                std::cout << Indent{indent_level} << "Boolean_And_Expression:\n";
-                print_ast(*node.lhs, indent_level + 1);
-                print_ast(*node.rhs, indent_level + 1);
-                return;
-            }
-
-            case AST_Node_Type::add_sub_expression: {
-                auto const& node = static_cast<Add_Sub_Expression const&>(ast_node);
-                std::cout << Indent{indent_level} << "Add_Sub_Expression (" << (node.is_add ? "addition" : "subtraction") << "):\n";
-                print_ast(*node.lhs, indent_level + 1);
-                print_ast(*node.rhs, indent_level + 1);
-                return;
-            }
-
-            case AST_Node_Type::mul_div_expression: {
-                auto const& node = static_cast<Mul_Div_Expression const&>(ast_node);
-                std::cout << Indent{indent_level} << "Mul_Div_Expression (" << (node.is_mul ? "multiplication" : "division") << "):\n";
-                print_ast(*node.lhs, indent_level + 1);
-                print_ast(*node.rhs, indent_level + 1);
                 return;
             }
 
@@ -152,6 +157,12 @@ namespace tildac {
                 std::cout << Indent{indent_level} << "If_Statement:\n";
                 print_ast(*node.block, indent_level + 1);
                 print_ast(*node.condition, indent_level + 1);
+                if (node.else_if) {
+                    print_ast(*node.else_if, indent_level + 1);
+                }
+                if (node.else_block) {
+                    print_ast(*node.else_block, indent_level + 1);
+                }
                 return;
             }
 

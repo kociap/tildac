@@ -1,3 +1,4 @@
+#include <tildac/codegen.hpp>
 #include <tildac/parser.hpp>
 
 #include <tildac/ast.hpp>
@@ -242,6 +243,7 @@ namespace tildac {
             while(!_lexer.match_eof()) {
                 if(Declaration* declaration = try_declaration(); declaration) {
                     print_ast(*declaration, 0);
+                    generate(*declaration, true);
                     delete declaration;
                 } else {
                     return false;
@@ -613,7 +615,19 @@ namespace tildac {
                 return nullptr;
             }
 
-            return new If_Statement(condition.release(), block.release());
+            if (_lexer.match(kw_else)) {
+                if (Owning_Ptr else_if = try_if_statement()) {
+                    return new If_Statement(condition.release(), block.release(), nullptr, else_if.release());
+                } else if (Owning_Ptr else_block = try_block_statement()) {
+                    return new If_Statement(condition.release(), block.release(), else_block.release(), nullptr);
+                } else {
+                    set_error("Expected `if` keyword or `{` token after `else` keyword");
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
+            } else {
+                return new If_Statement(condition.release(), block.release(), nullptr, nullptr);
+            }
         }
 
         While_Statement* try_while_statement() {
@@ -737,20 +751,39 @@ namespace tildac {
                 return nullptr;
             }
 
-            if(!_lexer.match(token_logic_or)) {
-                return lhs.release();
-            }
+            while(_lexer.match(token_logic_or)) {
+                Owning_Ptr rhs = try_boolean_or_expression();
+                if(!rhs) {
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
 
-            Owning_Ptr rhs = try_boolean_or_expression();
-            if(!rhs) {
+                lhs = new Binary_Expression(lhs.release(), Operator::binary_or, rhs.release());
+            }
+            return lhs.release();
+        }
+
+        Expression* try_boolean_and_expression() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            Owning_Ptr lhs = try_equality_expression();
+            if(!lhs) {
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
 
-            return new Boolean_Or_Expression(lhs.release(), rhs.release());
+            while(_lexer.match(token_logic_and)) {
+                Owning_Ptr rhs = try_boolean_and_expression();
+                if(!rhs) {
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
+
+                lhs = new Binary_Expression(lhs.release(), Operator::binary_and, rhs.release());
+            }
+            return lhs.release();
         }
 
-        Expression* try_boolean_and_expression() {
+        Expression* try_equality_expression() {
             Lexer_State const state_backup = _lexer.get_current_state();
             Owning_Ptr lhs = try_add_sub_expression();
             if(!lhs) {
@@ -758,17 +791,16 @@ namespace tildac {
                 return nullptr;
             }
 
-            if(!_lexer.match(token_logic_and)) {
-                return lhs.release();
-            }
+            while(_lexer.match(token_equal)) {
+                Owning_Ptr rhs = try_equality_expression();
+                if(!rhs) {
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
 
-            Owning_Ptr rhs = try_boolean_and_expression();
-            if(!rhs) {
-                _lexer.restore_state(state_backup);
-                return nullptr;
+                lhs = new Binary_Expression(lhs.release(), Operator::binary_eq, rhs.release());
             }
-
-            return new Boolean_And_Expression(lhs.release(), rhs.release());
+            return lhs.release();
         }
 
         Expression* try_add_sub_expression() {
@@ -780,17 +812,16 @@ namespace tildac {
             }
 
             bool const is_add = _lexer.match(token_plus);
-            if(!is_add && !_lexer.match(token_minus)) {
-                return lhs.release();
-            }
+            while(is_add || _lexer.match(token_minus)) {
+                Owning_Ptr rhs = try_add_sub_expression();
+                if(!rhs) {
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
 
-            Owning_Ptr rhs = try_add_sub_expression();
-            if(!rhs) {
-                _lexer.restore_state(state_backup);
-                return nullptr;
+                lhs = new Binary_Expression(lhs.release(), is_add ? Operator::binary_add : Operator::binary_sub, rhs.release());
             }
-
-            return new Add_Sub_Expression(is_add, lhs.release(), rhs.release());
+            return lhs.release();
         }
 
         Expression* try_mul_div_expression() {
@@ -801,18 +832,17 @@ namespace tildac {
                 return nullptr;
             }
 
-            bool const is_multiply = _lexer.match(token_multiply);
-            if(!is_multiply && !_lexer.match(token_divide)) {
-                return lhs.release();
-            }
+            bool const is_mul = _lexer.match(token_multiply);
+            while(is_mul || _lexer.match(token_divide)) {
+                Owning_Ptr rhs = try_mul_div_expression();
+                if(!rhs) {
+                    _lexer.restore_state(state_backup);
+                    return nullptr;
+                }
 
-            Owning_Ptr rhs = try_mul_div_expression();
-            if(!rhs) {
-                _lexer.restore_state(state_backup);
-                return nullptr;
+                lhs = new Binary_Expression(lhs.release(), is_mul ? Operator::binary_mul : Operator::binary_div, rhs.release());
             }
-
-            return new Mul_Div_Expression(is_multiply, lhs.release(), rhs.release());
+            return lhs.release();
         }
 
         Expression* try_primary_expression() {

@@ -6,6 +6,7 @@ namespace tildac {
     
     using u8 = unsigned char;
     using i64 = long long;
+    using u64 = unsigned long long;
 }
 
 #endif // !TILDAC_TYPES_HPP_INCLUDE
