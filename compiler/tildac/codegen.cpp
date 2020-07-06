@@ -297,10 +297,13 @@ namespace tildac {
         }
     }
 
-    void generate(const AST_Node& node, const bool optimize) {
+    void generate(const std::vector<Owning_Ptr<AST_Node>>& nodes, const bool optimize) {
         Compiler_Context context{};
 
-        generate_node(context, node);
+        for(const auto& node: nodes) {
+            generate_node(context, *node);
+        }
+
         llvm::legacy::PassManager pass_manager{};
         if(optimize) {
             llvm::PassBuilder pass_builder;

@@ -240,15 +240,15 @@ namespace tildac {
         Parser(std::istream& stream): _lexer(stream) {}
 
         bool build_ast() {
+            std::vector<Owning_Ptr<AST_Node>> nodes;
             while(!_lexer.match_eof()) {
-                if(Declaration* declaration = try_declaration(); declaration) {
-                    print_ast(*declaration, 0);
-                    generate(*declaration, true);
-                    delete declaration;
+                if(Declaration* declaration = try_declaration()) {
+                    nodes.emplace_back(declaration);
                 } else {
                     return false;
                 }
             }
+            generate(nodes, true);
             return true;
         }
 
