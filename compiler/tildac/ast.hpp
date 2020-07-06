@@ -13,10 +13,7 @@ namespace tildac {
         qualified_type,
         template_id,
         identifier_expression,
-        boolean_or_expression,
-        boolean_and_expression,
-        add_sub_expression,
-        mul_div_expression,
+        binary_expression,
         argument_list,
         function_call_expression,
         bool_literal,
@@ -35,6 +32,16 @@ namespace tildac {
         function_parameter_list,
         function_body,
         function_declaration,
+    };
+
+    enum struct Operator {
+        binary_or,
+        binary_and,
+        binary_eq,
+        binary_add,
+        binary_sub,
+        binary_mul,
+        binary_div
     };
 
     struct Source_Info {
@@ -89,36 +96,13 @@ namespace tildac {
         Identifier_Expression(Identifier* identifier): Expression({}, AST_Node_Type::identifier_expression), identifier(identifier) {}
     };
 
-    struct Boolean_Or_Expression: public Expression {
+    struct Binary_Expression: public Expression {
         Owning_Ptr<Expression> lhs;
+        Operator op;
         Owning_Ptr<Expression> rhs;
 
-        Boolean_Or_Expression(Expression* lhs, Expression* rhs): Expression({}, AST_Node_Type::boolean_or_expression), lhs(lhs), rhs(rhs) {}
-    };
-
-    struct Boolean_And_Expression: public Expression {
-        Owning_Ptr<Expression> lhs;
-        Owning_Ptr<Expression> rhs;
-
-        Boolean_And_Expression(Expression* lhs, Expression* rhs): Expression({}, AST_Node_Type::boolean_and_expression), lhs(lhs), rhs(rhs) {}
-    };
-
-    struct Add_Sub_Expression: public Expression {
-        Owning_Ptr<Expression> lhs;
-        Owning_Ptr<Expression> rhs;
-        bool is_add;
-
-        Add_Sub_Expression(bool is_add, Expression* lhs, Expression* rhs)
-            : Expression({}, AST_Node_Type::add_sub_expression), lhs(lhs), rhs(rhs), is_add(is_add) {}
-    };
-
-    struct Mul_Div_Expression: public Expression {
-        Owning_Ptr<Expression> lhs;
-        Owning_Ptr<Expression> rhs;
-        bool is_mul;
-
-        Mul_Div_Expression(bool is_mul, Expression* lhs, Expression* rhs)
-            : Expression({}, AST_Node_Type::mul_div_expression), lhs(lhs), rhs(rhs), is_mul(is_mul) {}
+        Binary_Expression(Expression* lhs, Operator op, Expression* rhs)
+            : Expression({}, AST_Node_Type::binary_expression), lhs(lhs), op(op), rhs(rhs) {}
     };
 
     struct Argument_List: public AST_Node {
@@ -207,8 +191,11 @@ namespace tildac {
     struct If_Statement: public Statement {
         Owning_Ptr<Expression> condition;
         Owning_Ptr<Block_Statement> block;
+        Owning_Ptr<Block_Statement> else_block;
+        Owning_Ptr<If_Statement> else_if;
 
-        If_Statement(Expression* condition, Block_Statement* block): Statement({}, AST_Node_Type::if_statement), condition(condition), block(block) {}
+        If_Statement(Expression* condition, Block_Statement* block, Block_Statement* else_block, If_Statement* else_if)
+            : Statement({}, AST_Node_Type::if_statement), condition(condition), block(block), else_block(else_block), else_if(else_if) {}
     };
 
     struct While_Statement: public Statement {
