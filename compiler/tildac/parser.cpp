@@ -1,4 +1,3 @@
-#include <tildac/codegen.hpp>
 #include <tildac/parser.hpp>
 
 #include <tildac/ast.hpp>
@@ -7,7 +6,6 @@
 #include <tildac/utility.hpp>
 
 #include <fstream>
-#include <iostream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -210,7 +208,7 @@ namespace tildac {
             }
         }
 
-        Lexer_State get_current_state() const {
+        Lexer_State get_current_state() {
             ignore_whitespace_and_comments();
             return {_stream.tellg(), _line, _column};
         }
@@ -250,21 +248,16 @@ namespace tildac {
     public:
         Parser(std::istream& stream): _lexer(stream) {}
 
-        bool build_ast() {
-            std::vector<Owning_Ptr<AST_Node>> nodes;
+        anton::Expected<Owning_Ptr<Declaration_Sequence>, Parse_Error> build_ast() {
+            Owning_Ptr decls = new Declaration_Sequence();
             while(!_lexer.match_eof()) {
                 if(Declaration* declaration = try_declaration()) {
-                    nodes.emplace_back(declaration);
+                    decls->append(declaration);
                 } else {
-                    return false;
+                    return {anton::expected_error, _last_error};
                 }
             }
-            generate(nodes, true);
-            return true;
-        }
-
-        [[nodiscard]] Parse_Error get_last_error() const {
-            return _last_error;
+            return {anton::expected_value, std::move(decls)};
         }
 
     private:
@@ -1036,19 +1029,15 @@ namespace tildac {
         }
     };
 
-    void parse_file(std::string_view const path) {
-        std::cout << "Opening " << path << " for reading" << std::endl;
+    anton::Expected<Owning_Ptr<Declaration_Sequence>, Parse_Error> parse_file(std::string_view const path) {
         std::string const path_str(path);
         std::ifstream file(path_str);
         if(!file) {
-            std::cout << "Could not open " << path << "\n";
-            return;
+            Parse_Error error{u8"Could not open for reading", 0, 0, 0};
+            return {anton::expected_error, anton::move(error)};
         }
 
         Parser parser(file);
-        if(!parser.build_ast()) {
-            Parse_Error error = parser.get_last_error();
-            std::cout << path << " (" << error.line << ":" << error.column << ") error: " << error.message << '\n';
-        }
+        return parser.build_ast();
     }
 } // namespace tildac

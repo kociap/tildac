@@ -62,22 +62,14 @@ namespace tildac {
             module.setDataLayout(target_cpu->createDataLayout());
 
             builtin_types = {
-                { "void", llvm::Type::getVoidTy(handle) },
-                { "bool", llvm::Type::getInt1Ty(handle) },
-                { "i8", llvm::Type::getInt8Ty(handle) },
-                { "i16", llvm::Type::getInt16Ty(handle) },
-                { "i32", llvm::Type::getInt32Ty(handle) },
-                { "i64", llvm::Type::getInt64Ty(handle) },
-                { "u8", llvm::Type::getInt8Ty(handle) },
-                { "u16", llvm::Type::getInt16Ty(handle) },
-                { "u32", llvm::Type::getInt32Ty(handle) },
-                { "u64", llvm::Type::getInt64Ty(handle) },
-                { "c8", llvm::Type::getInt8Ty(handle) },
-                { "c16", llvm::Type::getInt16Ty(handle) },
-                { "c32", llvm::Type::getInt32Ty(handle) },
-                { "f32", llvm::Type::getFloatTy(handle) },
-                { "f64", llvm::Type::getDoubleTy(handle) },
-                { "c8**", llvm::PointerType::get(llvm::PointerType::get(llvm::Type::getInt8Ty(handle), 0), 0) },
+                {"void", llvm::Type::getVoidTy(handle)},  {"bool", llvm::Type::getInt1Ty(handle)},
+                {"i8", llvm::Type::getInt8Ty(handle)},    {"i16", llvm::Type::getInt16Ty(handle)},
+                {"i32", llvm::Type::getInt32Ty(handle)},  {"i64", llvm::Type::getInt64Ty(handle)},
+                {"u8", llvm::Type::getInt8Ty(handle)},    {"u16", llvm::Type::getInt16Ty(handle)},
+                {"u32", llvm::Type::getInt32Ty(handle)},  {"u64", llvm::Type::getInt64Ty(handle)},
+                {"c8", llvm::Type::getInt8Ty(handle)},    {"c16", llvm::Type::getInt16Ty(handle)},
+                {"c32", llvm::Type::getInt32Ty(handle)},  {"f32", llvm::Type::getFloatTy(handle)},
+                {"f64", llvm::Type::getDoubleTy(handle)}, {"c8**", llvm::PointerType::get(llvm::PointerType::get(llvm::Type::getInt8Ty(handle), 0), 0)},
             };
         }
     };
@@ -324,6 +316,7 @@ namespace tildac {
             pass_manager.add(llvm::createGVNPass());
             pass_manager.add(llvm::createCFGSimplificationPass());
         }
+        // TODO: in-memory compilation and output to different files
         std::error_code file_error_code;
         llvm::raw_fd_ostream output("output.o", file_error_code, llvm::sys::fs::OF_None);
         if(context.target_cpu->addPassesToEmitFile(pass_manager, output, nullptr, llvm::CGFT_ObjectFile)) {
