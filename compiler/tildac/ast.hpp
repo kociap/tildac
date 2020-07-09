@@ -3,7 +3,6 @@
 #include <tildac/types.hpp>
 #include <tildac/utility.hpp>
 
-#include <ostream>
 #include <string>
 #include <vector>
 
@@ -23,6 +22,7 @@ namespace tildac {
         statement_list,
         block_statement,
         if_statement,
+        for_statement,
         while_statement,
         do_while_statement,
         return_statement,
@@ -41,11 +41,11 @@ namespace tildac {
         binary_add,
         binary_sub,
         binary_mul,
-        binary_div
+        binary_div,
     };
 
     struct Source_Info {
-        char const* file;
+        std::string_view file_path;
         i64 file_offset;
         i64 line;
         i64 column;
@@ -101,8 +101,7 @@ namespace tildac {
         Operator op;
         Owning_Ptr<Expression> rhs;
 
-        Binary_Expression(Expression* lhs, Operator op, Expression* rhs)
-            : Expression({}, AST_Node_Type::binary_expression), lhs(lhs), op(op), rhs(rhs) {}
+        Binary_Expression(Expression* lhs, Operator op, Expression* rhs): Expression({}, AST_Node_Type::binary_expression), lhs(lhs), op(op), rhs(rhs) {}
     };
 
     struct Argument_List: public AST_Node {
@@ -196,6 +195,17 @@ namespace tildac {
 
         If_Statement(Expression* condition, Block_Statement* block, Block_Statement* else_block, If_Statement* else_if)
             : Statement({}, AST_Node_Type::if_statement), condition(condition), block(block), else_block(else_block), else_if(else_if) {}
+    };
+
+    // condition and post_expr are optional.
+    struct For_Statement: public Statement {
+        // TODO: Add inits
+        Owning_Ptr<Expression> condition;
+        Owning_Ptr<Expression> post_expr;
+        Owning_Ptr<Statement_List> statements;
+
+        For_Statement(Expression* condition, Expression* post_expr, Statement_List* statements, Source_Info const& source_info)
+            : Statement(source_info, AST_Node_Type::for_statement), condition(condition), post_expr(post_expr), statements(statements) {}
     };
 
     struct While_Statement: public Statement {

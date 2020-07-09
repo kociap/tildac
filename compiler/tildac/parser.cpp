@@ -130,7 +130,7 @@ namespace tildac {
     public:
         Lexer(std::istream& file): _stream(file) {}
 
-        bool match(std::string_view const string) {
+        bool match(std::string_view const string, bool const must_not_be_followed_by_identifier_char = false) {
             ignore_whitespace_and_comments();
 
             Lexer_State const state_backup = get_current_state();
@@ -140,7 +140,17 @@ namespace tildac {
                     return false;
                 }
             }
-            return true;
+
+            if(must_not_be_followed_by_identifier_char) {
+                if(is_identifier_character(peek_next())) {
+                    restore_state(state_backup);
+                    return false;
+                } else {
+                    return true;
+                }
+            } else {
+                return true;
+            }
         }
 
         // TODO: String interning if it becomes too slow/memory heavy.
@@ -201,6 +211,7 @@ namespace tildac {
         }
 
         Lexer_State get_current_state() const {
+            ignore_whitespace_and_comments();
             return {_stream.tellg(), _line, _column};
         }
 
@@ -259,6 +270,7 @@ namespace tildac {
     private:
         Lexer _lexer;
         Parse_Error _last_error;
+        std::string_view _filename;
 
         void set_error(std::string_view const message, Lexer_State const state) {
             if(state.stream_offset > _last_error.file_offset) {
@@ -277,6 +289,10 @@ namespace tildac {
                 _last_error.column = state.column;
                 _last_error.file_offset = state.stream_offset;
             }
+        }
+
+        Source_Info src_info(Lexer_State const& state) {
+            return Source_Info{_filename, state.line, state.column, state.stream_offset};
         }
 
         Declaration* try_declaration() {
@@ -482,6 +498,11 @@ namespace tildac {
                     continue;
                 }
 
+                if(For_Statement* for_statement = try_for_statement()) {
+                    statements->append(for_statement);
+                    continue;
+                }
+
                 if(While_Statement* while_statement = try_while_statement()) {
                     statements->append(while_statement);
                     continue;
@@ -597,8 +618,8 @@ namespace tildac {
 
         If_Statement* try_if_statement() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            if(!_lexer.match(kw_if)) {
-                set_error("Expected `if`.");
+            if(!_lexer.match(kw_if, true)) {
+                set_error("expected 'if'");
                 _lexer.restore_state(state_backup);
                 return nullptr;
             }
@@ -615,13 +636,13 @@ namespace tildac {
                 return nullptr;
             }
 
-            if (_lexer.match(kw_else)) {
-                if (Owning_Ptr else_if = try_if_statement()) {
+            if(_lexer.match(kw_else, true)) {
+                if(Owning_Ptr else_if = try_if_statement()) {
                     return new If_Statement(condition.release(), block.release(), nullptr, else_if.release());
-                } else if (Owning_Ptr else_block = try_block_statement()) {
+                } else if(Owning_Ptr else_block = try_block_statement()) {
                     return new If_Statement(condition.release(), block.release(), else_block.release(), nullptr);
                 } else {
-                    set_error("Expected `if` keyword or `{` token after `else` keyword");
+                    set_error("expected 'if' keyword or '{' token after 'else'");
                     _lexer.restore_state(state_backup);
                     return nullptr;
                 }
@@ -630,9 +651,50 @@ namespace tildac {
             }
         }
 
+        For_Statement* try_for_statement() {
+            Lexer_State const state_backup = _lexer.get_current_state();
+            if(!_lexer.match(kw_for, true)) {
+                set_error(u8"expected 'for'");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            if(!_lexer.match(token_semicolon)) {
+                set_error(u8"expected ';'");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr condition = try_expression();
+
+            if(!_lexer.match(token_semicolon)) {
+                set_error(u8"expected ';'");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr post_expr = try_expression();
+
+            if(!_lexer.match(token_brace_open)) {
+                set_error(u8"expected '{'");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            Owning_Ptr statements = try_statement_list();
+
+            if(!_lexer.match(token_brace_close)) {
+                set_error(u8"expected '}'");
+                _lexer.restore_state(state_backup);
+                return nullptr;
+            }
+
+            return new For_Statement(condition.release(), post_expr.release(), statements.release(), src_info(state_backup));
+        }
+
         While_Statement* try_while_statement() {
             Lexer_State const state_backup = _lexer.get_current_state();
-            if(!_lexer.match(kw_while)) {
+            if(!_lexer.match(kw_while, true)) {
                 set_error("Expected `while`.");
                 _lexer.restore_state(state_backup);
                 return nullptr;
